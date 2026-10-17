@@ -20,10 +20,14 @@
 ## 快速开始
 
 ```bash
-直接打开 src/index.html     # 零依赖
-npm run build               # 生成单文件版 dist/strata-pc-simulator.html
+npm run serve               # → http://127.0.0.1:8080/src/index.html
+npm install && npm run build # 生成单文件版 dist/strata-pc-simulator.html（3D 已内联，可离线双击）
 npm test                    # 36 项验算
 ```
+
+> ⚠️ **不要直接双击 `src/index.html`**：浏览器会拦掉 `file://` 下的 ES module，3D 起不来。
+> 开发时用 `npm run serve`（**必须把仓库根目录当服务根**，因为 `index.html` 引用 `../vendor/` 和 `../assets/`）；
+> 想要双击即用，就打开 `npm run build` 生成的单文件版。
 
 ## 数据出处与免责
 

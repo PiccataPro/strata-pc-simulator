@@ -81,23 +81,63 @@ function ramPickSlot() {
   for (const i of order) if (!build.ram[i]) return i;
   return -1;
 }
-function install(id, cat, slotIdx) {
+/* ---- 台面备用件：从机箱拆下来的零件不再凭空消失，摆到桌上待用 ---- */
+let spares = [], spareSeq = 0;
+function addSpare(id, cat) {
+  if (!id || cat === 'case') return;            // 整只机箱不留台面
+  spares.push({ uid: 'sp' + (++spareSeq), id, cat });
+}
+function consumeSpare(id, uid) {
+  const i = uid ? spares.findIndex(s => s.uid === uid) : spares.findIndex(s => s.id === id);
+  if (i >= 0) spares.splice(i, 1);
+}
+window.delSpare = uid => { spares = spares.filter(s => s.uid !== uid); onChange(); };
+
+function install(id, cat, slotIdx, uid) {
+  /* 注意：先装成功再吃掉台面上的那只。
+     原来是把 consumeSpare 放在最前面，槽位已满（比如已有两张卡）时会先删掉备用件、
+     然后在下面的长度判断里直接 return —— 结果就是「点了装不回去，零件还凭空消失」。 */
   if (cat === 'ram') {
     const n = ramSlotCount();
     while (build.ram.length < n) build.ram.push(null);
     const i = (slotIdx != null && slotIdx >= 0 && slotIdx < n) ? slotIdx : ramPickSlot();
-    if (i < 0) return;
+    if (i < 0) return false;
     build.ram[i] = id; // 占用槽→替换
   }
-  else if (cat === 'gpu') { if (build.gpu.length < 2) build.gpu.push(id); }
-  else if (cat === 'ssd') { if (build.ssd.length < 4) build.ssd.push(id); }
+  else if (cat === 'gpu') {
+    if (build.gpu.length >= 2) return false;
+    build.gpu.push(id);
+  }
+  else if (cat === 'ssd') {
+    if (build.ssd.length >= 4) return false;
+    build.ssd.push(id);
+  }
   else build[cat] = id;
+  consumeSpare(id, uid);
   onChange();
+  return true;
 }
+/* 点台面上的零件 → 装回机箱（3D 视图里点一下就走这条路） */
+window.installSpare = uid => {
+  const s = spares.find(x => x.uid === uid);
+  if (!s) return;
+  if (!install(s.id, s.cat, null, uid)) {
+    const nm = (P.byId(s.id) || {}).name || s.cat;
+    alert('装不回去了：' + nm + ' 对应的插槽已满（显卡最多 2 张 / 固态最多 4 块 / 内存槽已插满）');
+  }
+};
 function removePart(cat, idx) {
-  if (cat === 'ram') { build.ram[idx] = null; onChange(); return; }
-  if (cat === 'gpu' || cat === 'ssd') build[cat].splice(idx, 1);
-  else build[cat] = null;
+  if (cat === 'ram') {
+    const id = build.ram[idx]; addSpare(id, 'ram');
+    build.ram[idx] = null; onChange(); return;
+  }
+  if (cat === 'gpu' || cat === 'ssd') {
+    addSpare(build[cat][idx], cat);
+    build[cat].splice(idx, 1);
+  } else {
+    addSpare(build[cat], cat);
+    build[cat] = null;
+  }
   onChange();
 }
 
@@ -289,6 +329,8 @@ function ensure3D() {
   if (inited3d || !window.STRATA_3D) return;
   window.STRATA_3D.init(document.getElementById('case3d'));
   window.STRATA_3D.onRemove((cat, idx) => removePart(cat, idx));
+  window.STRATA_3D.onSpareDelete(uid => window.delSpare(uid));
+  window.STRATA_3D.onSpareInstall(uid => window.installSpare(uid));
   inited3d = true;
 }
 function applyView() {
@@ -303,17 +345,58 @@ function applyView() {
     if (inited3d) {
       const a = P.analyze(build, settings());
       window.STRATA_3D.sync(build, a);
+      window.STRATA_3D.setSpares(spares);
       window.STRATA_3D.setPhase(running ? 'run' : 'idle');
     }
   }
 }
+/* ---- 3D 不可用时的诊断 ----
+ * 以前这里只是一句 alert('3D 模块未加载')，看不出到底哪里错了。
+ * 实际上 99% 是下面两种之一，直接把人指到正确操作上。 */
+function why3dUnavailable() {
+  if (location.protocol === 'file:') {
+    return '当前是 file:// 直接打开的 src/index.html。浏览器会拦截 ES module 与本地资源请求，3D 起不来。\n\n' +
+      '两条路任选：\n' +
+      '① 打开单文件版 dist/strata-pc-simulator.html（3D 已内联，双击即用）\n' +
+      '② 在项目根目录运行 npm run serve，再访问 http://127.0.0.1:8080/src/index.html';
+  }
+  return '3D 模块没能加载：取不到 ../vendor/three.module.js。\n\n' +
+    '最常见原因：把 src/ 当成了服务根目录。src/index.html 引用的是 ../vendor/ 和 ../assets/，\n' +
+    '服务根必须是仓库根目录。\n\n' +
+    '在仓库根目录运行 npm run serve，然后打开 http://127.0.0.1:8080/src/index.html';
+}
+function show3dNotice() {
+  const wrap = document.getElementById('caseWrap');
+  if (!wrap || document.getElementById('notice3d')) return;
+  const d = document.createElement('div');
+  d.id = 'notice3d';
+  d.className = 'notice3d';
+  d.innerHTML = '<b>3D 视图不可用</b><pre></pre>';
+  d.querySelector('pre').textContent = why3dUnavailable();
+  wrap.appendChild(d);
+}
+function mark3dState() {
+  const b = document.getElementById('btnView');
+  if (!b) return;
+  if (window.STRATA_3D) {
+    b.classList.remove('off');
+    b.title = '';
+    b.textContent = view3d ? '⇄ 切回 2D' : '⇄ 切到 3D';
+  } else {
+    b.classList.add('off');
+    b.textContent = '⇄ 3D 不可用';
+    b.title = why3dUnavailable();
+  }
+}
 function toggleView() {
-  if (!window.STRATA_3D) { alert('3D 模块未加载（需 importmap 环境或单文件版）'); return; }
+  if (!window.STRATA_3D) { show3dNotice(); return; }
   view3d = !view3d; applyView();
 }
 document.getElementById('btnView').addEventListener('click', toggleView);
 document.getElementById('btnDoor').addEventListener('click', () => window.STRATA_3D && window.STRATA_3D.toggleDoor());
 document.getElementById('btnReset').addEventListener('click', () => window.STRATA_3D && window.STRATA_3D.resetView());
+/* 模块是异步加载的：等 load 之后再看一眼 STRATA_3D 在不在，不在就把按钮标灰。 */
+window.addEventListener('load', () => setTimeout(mark3dState, 200));
 
 /* ---- 主刷新 ---- */
 function onChange() {
@@ -323,13 +406,19 @@ function onChange() {
   const a = P.analyze(build, st);
   renderShelves();
   renderCase(a);
-  if (view3d && inited3d) window.STRATA_3D.sync(build, a);
+  if (view3d && inited3d) { window.STRATA_3D.sync(build, a); window.STRATA_3D.setSpares(spares); }
   document.getElementById('priceTag').textContent = '整机参考造价 ¥' + totalPrice().toLocaleString() + '（闲鱼 2026-10-17 成交行情：内存/SSD 已按涨价潮校准）';
   const btn = document.getElementById('bootBtn');
   if (!running) {
     btn.disabled = !a.canPost;
     btn.classList.toggle('ready', a.canPost);
     btn.textContent = a.canPost ? '启动' : '未就绪';
+  }
+  /* 跑分按钮：只有开机运行中才可用（状态收口在 app2.js 的 syncBenchBtn） */
+  if (window.syncBenchBtn) window.syncBenchBtn();
+  else {
+    const bb = document.getElementById('benchBtn');
+    if (bb) { bb.disabled = !running; bb.title = running ? '跑一遍 StrataBench' : '先按启动点亮机器'; }
   }
   if (window.updateStatus) updateStatus(a, st);
 }

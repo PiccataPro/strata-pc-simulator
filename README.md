@@ -26,16 +26,19 @@ This simulator encodes those rules as an explicit compatibility matrix and a tim
 ## Quick start
 
 ```bash
-# Option A — just open it
-open src/index.html          # macOS
-start src/index.html         # Windows
-npx http-server src -p 8080  # or serve it
-
-# Option B — single self-contained file (for sharing)
-npm run build                # → dist/strata-pc-simulator.html
+npm run serve       # → http://127.0.0.1:8080/src/index.html
 ```
 
-No build step, no framework, no dependencies. ES5-compatible vanilla JS.
+`npm run serve` is a zero-dependency static server that **must be rooted at the repository root**, because `src/index.html` loads `../vendor/three.module.js` and `../assets/models/*.glb`. Serving `src/` as the root makes both 404 — the 3D view silently drops to 2D. Opening `src/index.html` from `file://` fails for the same reason: browsers block ES modules on `file://`.
+
+Prefer a double-click? Use the single-file build, which inlines Three.js and works offline:
+
+```bash
+npm install        # devDependency: esbuild — only needed to build
+npm run build      # → dist/strata-pc-simulator.html  (+ docs/index.html for Pages)
+```
+
+No framework, no runtime dependencies. The app itself is vanilla ES5-compatible JS + Three.js.
 
 ## Running the tests
 
@@ -63,6 +66,8 @@ src/
   sim.js       Strata time & thermal model (calibrated)
   app.js       assembly, drag & drop, case SVG renderer
   app2.js      boot animation + dashboard
+  3d.js        Three.js scene (ES module, bundled at build time)
+scripts/serve.js   zero-dep dev server, rooted at repo root
 scripts/build.js   inlines everything → dist/ single file
 test.js            36-check verification suite (node test.js)
 docs/calibration.md  where every number comes from

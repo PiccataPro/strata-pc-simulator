@@ -24,37 +24,69 @@ html = html.replace(/<script src="([^"]+)"><\/script>/g, (m, file) => {
 
 /* 3D 模块：esbuild 打包 three + addons + 3d.js → iife 内联（单文件版离线可用） */
 function findEsbuild() {
+  const exe = process.platform === 'win32' ? 'esbuild.exe' : 'esbuild';
   const cands = [
     process.env.ESBUILD_BIN,
-    path.join(os.homedir(), '.workbuddy/binaries/node/workspace/node_modules/@esbuild/win32-x64/esbuild.exe'),
-    path.join(os.homedir(), '.workbuddy/binaries/node/workspace/node_modules/.bin/esbuild'),
-    'esbuild',
+    path.join(root, 'node_modules', '@esbuild', process.platform + '-' + process.arch, exe),
+    path.join(root, 'node_modules', '.bin', exe),
+    path.join(root, 'node_modules', 'esbuild', 'bin', 'esbuild'),
+    'esbuild', // PATH 兜底，交给 execFileSync 解析
   ].filter(Boolean);
   for (const c of cands) {
-    if (c === 'esbuild') return c; // PATH 兜底，交给 execFileSync 解析
+    if (c === 'esbuild') return c;
     if (fs.existsSync(c)) return c;
   }
   return null;
 }
+
+const ESBUILD_HINT = [
+  '',
+  'build 失败：找不到 esbuild，无法把 src/3d.js 打包进单文件版。',
+  '',
+  '  旧版本这里是「静默降级」——保留 importmap 外链、退出码 0，产出一个没有 3D 的',
+  '  dist/strata-pc-simulator.html。线上 3D 就是这样丢的，所以现在改为直接失败。',
+  '',
+  '  任选其一：',
+  '    1) npm install                         （推荐，esbuild 已在 devDependencies）',
+  '    2) ESBUILD_BIN=<path>/esbuild          指向已有的可执行文件',
+  '    3) STRATA3D_BUNDLE=<path>/bundle.js    使用预打包好的 iife 产物',
+  '',
+].join('\n');
+
 const moduleTag = /<script type="importmap">[\s\S]*?<\/script>\s*<script type="module" src="3d\.js"><\/script>/;
 if (moduleTag.test(html)) {
-  const ESBUILD = findEsbuild();
-  if (ESBUILD) {
-    const tmp = path.join(os.tmpdir(), 'strata3d.bundle.' + process.pid + '.js');
-    execFileSync(ESBUILD, [
-      path.join(srcDir, '3d.js'),
-      '--bundle', '--format=iife', '--minify',
-      '--alias:three=' + path.join(vendorDir, 'three.module.js'),
-      '--alias:three/addons=' + vendorDir,
-      '--outfile=' + tmp,
-    ], { cwd: root, stdio: 'inherit' });
-    const js = fs.readFileSync(tmp, 'utf8');
-    fs.unlinkSync(tmp);
-    html = html.replace(moduleTag, '<script>\n' + js + '\n</script>');
-    console.log('OK → 3D 模块已 esbuild 内联（' + (js.length / 1024).toFixed(0) + ' KB）');
+  let js;
+  if (process.env.STRATA3D_BUNDLE) {
+    /* 预打包通道：限制不能 spawn 子进程的环境，或 CI 里复用缓存产物。
+       生成方式：esbuild src/3d.js --bundle --format=iife --minify \
+                 --alias:three=vendor/three.module.js --alias:three/addons=vendor */
+    js = fs.readFileSync(process.env.STRATA3D_BUNDLE, 'utf8');
+    console.log('OK → 3D 模块取自预打包 bundle（' + (js.length / 1024).toFixed(0) + ' KB）');
   } else {
-    console.warn('WARN: 未找到 esbuild，3D 模块保留 importmap 外链（单文件版在无 vendor 目录下 3D 不可用）');
+    const ESBUILD = findEsbuild();
+    if (!ESBUILD) {
+      console.error(ESBUILD_HINT);
+      process.exit(1);
+    }
+    const tmp = path.join(os.tmpdir(), 'strata3d.bundle.' + process.pid + '.js');
+    try {
+      execFileSync(ESBUILD, [
+        path.join(srcDir, '3d.js'),
+        '--bundle', '--format=iife', '--minify',
+        '--alias:three=' + path.join(vendorDir, 'three.module.js'),
+        '--alias:three/addons=' + vendorDir,
+        '--outfile=' + tmp,
+      ], { cwd: root, stdio: 'inherit' });
+    } catch (e) {
+      console.error('build 失败：esbuild 执行出错（' + ESBUILD + '）');
+      console.error(String(e.message || e));
+      process.exit(1);
+    }
+    js = fs.readFileSync(tmp, 'utf8');
+    fs.unlinkSync(tmp);
+    console.log('OK → 3D 模块已 esbuild 内联（' + (js.length / 1024).toFixed(0) + ' KB）');
   }
+  html = html.replace(moduleTag, '<script>\n' + js + '\n</script>');
 }
 
 if (/<script src=/.test(html)) {

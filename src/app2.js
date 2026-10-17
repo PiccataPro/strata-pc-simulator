@@ -95,12 +95,22 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 /* boot 代际令牌：点停机/重新开机时递增，使旧的异步 boot 流程在下一个 await 处作废，
  * 避免"启动动画跑到一半被停止、剩余步骤又把状态改回运行中"的竞态 */
 let bootGen = 0;
+/* 跑分按钮的可用状态只跟「机器是否已经跑起来」有关。
+ * 之前只在 onChange（改配置）里刷新，点完启动后就再也没人碰它 →
+ * 机器明明在跑，按钮还是灰的。这里收口成一个函数，boot/shutdown/onChange 都调它。 */
+window.syncBenchBtn = function () {
+  const bb = document.getElementById('benchBtn');
+  if (!bb) return;
+  bb.disabled = !running;
+  bb.title = running ? '跑一遍 StrataBench' : '先按「启动」点亮机器';
+};
 async function boot() {
   const st = settings();
   const a = P.analyze(build, st);
   if (!a.canPost) return;
   const gen = ++bootGen;
   running = true;
+  window.syncBenchBtn();
   const btn = document.getElementById('bootBtn');
   btn.classList.remove('ready'); btn.classList.add('running'); btn.textContent = '停止';
   btn.title = '点击停止仿真';
@@ -143,6 +153,7 @@ async function boot() {
 function shutdown() {
   bootGen++;
   running = false;
+  window.syncBenchBtn();
   if (window.__dashTimer) { clearInterval(window.__dashTimer); window.__dashTimer = null; }
   window.__inferMode = 'decode';
   const v3 = window.STRATA_3D && window.isView3d && window.isView3d();
@@ -151,3 +162,46 @@ function shutdown() {
   onChange(); // 按钮/风扇/读数回到未运行态
 }
 document.getElementById('bootBtn').addEventListener('click', () => { if (!running) boot(); else shutdown(); });
+
+/* ---- StrataBench 跑分：一段有仪式感的序列 + 结果卡 ---- */
+let benchGen = 0;
+function brow(k, v) { return '<div class="row"><span>' + k + '</span><b>' + v + '</b></div>'; }
+async function runBench() {
+  if (!running) return;
+  const ov = document.getElementById('benchOv');
+  const bar = ov.querySelector('.bar i');
+  const res = ov.querySelector('.res');
+  const ttl = ov.querySelector('.ttl');
+  const st = settings(), m = S.simulate(build, st).m;
+  const gen = ++benchGen;
+  ov.style.display = 'flex';
+  bar.style.width = '0%';
+  ttl.textContent = 'StrataBench 跑分';
+  const steps = ['风扇提速 · 温度爬升', 'prefill：灌入 8K 提示词', 'decode：连续生成 512 tokens', '汇总'];
+  for (let i = 0; i < steps.length; i++) {
+    if (gen !== benchGen) return;
+    res.innerHTML = '<div class="ph">' + steps[i] + ' …</div>';
+    await sleep(620 + Math.random() * 380);
+    bar.style.width = Math.round((i + 1) / steps.length * 100) + '%';
+  }
+  if (gen !== benchGen) return;
+  /* 综合分 =（解码×100 + Prefill×3）× 乐观系数。
+   * 系数只作用在这一个自造的综合分上——解码 t/s、温度、功率这些物理量不动，
+   * 因为它们同时驱动仪表盘，掺水会和别处的数字对不上。 */
+  const SCORE_SCALE = 1.4;
+  const score = Math.round((m.decode * 100 + m.prefill * 3) * SCORE_SCALE);
+  ttl.textContent = 'StrataBench · 完成';
+  res.innerHTML =
+    brow('解码吞吐', m.decode.toFixed(1) + ' t/s' + (st.conc > 1 ? '（总 ' + m.decodeTotal.toFixed(1) + '）' : '')) +
+    brow('Prefill', Math.round(m.prefill) + ' t/s') +
+    brow('首字延迟 TTFT', m.ttft >= 100 ? Math.round(m.ttft / 60) + ' 分 ' + Math.round(m.ttft % 60) + ' 秒' : m.ttft + ' s') +
+    brow('整机功率', Math.round(m.power) + ' W') +
+    brow('GPU 温度', m.temps.gpu.join(' / ') + ' °C') +
+    '<div class="score">' + score.toLocaleString() + '</div>' +
+    '<div class="sl">综合分 =（解码×100 + Prefill×3）× 1.4 —— 只用于同配置横向比较</div>';
+}
+document.getElementById('benchBtn').addEventListener('click', runBench);
+document.getElementById('benchClose').addEventListener('click', () => {
+  benchGen++;                                   // 作废还在跑的流程
+  document.getElementById('benchOv').style.display = 'none';
+});

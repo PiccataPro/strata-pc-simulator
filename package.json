@@ -6,7 +6,8 @@
   "scripts": {
     "test": "node test.js",
     "build": "node scripts/build.js",
-    "serve": "npx http-server src -p 8080 -c-1"
+    "serve": "node scripts/serve.js",
+    "audit": "node scripts/audit3d.js"
   },
   "keywords": [
     "strata",
@@ -24,5 +25,8 @@
   "license": "MIT",
   "engines": {
     "node": ">=16"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
   }
 }

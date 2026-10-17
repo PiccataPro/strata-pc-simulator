@@ -84,6 +84,9 @@ footer{display:flex;align-items:center;gap:16px;padding:12px 16px;background:var
 #bootBtn.ready{border-color:var(--ok);color:var(--ok);box-shadow:0 0 22px #3fd68f44}
 #bootBtn.running{border-color:var(--acc);color:var(--acc);box-shadow:0 0 30px #3fb6ff66;animation:pulse 1.6s infinite}
 #bootBtn:disabled{cursor:not-allowed}
+#benchBtn{padding:9px 18px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--dim);font-size:13px;cursor:pointer;letter-spacing:2px;transition:.2s}
+#benchBtn:not(:disabled){color:var(--acc);border-color:var(--acc);box-shadow:0 0 14px #3fb6ff33}
+#benchBtn:disabled{cursor:not-allowed;opacity:.45}
 #bootLog{flex:1;font-size:12px;color:var(--dim);max-height:86px;overflow-y:auto;background:#0b0f16;border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-family:Consolas,monospace}
 #bootLog .l-ok{color:var(--ok)}#bootLog .l-err{color:var(--err)}#bootLog .l-w{color:var(--warn)}
 #hint{font-size:11px;color:var(--dim);max-width:260px}
@@ -92,9 +95,37 @@ footer{display:flex;align-items:center;gap:16px;padding:12px 16px;background:var
 /* ---- 3D 视图 ---- */
 #case3d{display:none;width:100%;height:560px;border-radius:10px;overflow:hidden;position:relative}
 #case3d canvas{display:block;width:100%;height:100%}
+/* 台面备用件浮标：名称 + × 彻底删除 */
+.spareTip{position:absolute;transform:translate(-50%,-135%);display:none;align-items:center;gap:10px;background:#141c2aee;border:1px solid var(--line);border-radius:9px;padding:6px 7px 6px 11px;font-size:11.5px;color:var(--txt);z-index:9;white-space:nowrap;backdrop-filter:blur(4px);box-shadow:0 10px 26px #0007}
+.spareTip .tx{display:flex;flex-direction:column;gap:2px;max-width:240px}
+.spareTip .nm{font-weight:600;overflow:hidden;text-overflow:ellipsis}
+.spareTip .sp{display:flex;gap:7px;font-size:10.5px;color:var(--dim)}
+.spareTip .sp em{font-style:normal;color:var(--acc);opacity:.9}
+.spareTip .x{width:20px;height:20px;line-height:1;border-radius:5px;border:1px solid #3a2a2e;background:#2a1216;color:var(--err);font-size:14px;cursor:pointer;padding:0}
+.spareTip .x:hover{background:var(--err);color:#fff}
+/* 跑分浮层 */
+#benchOv{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:#05080cd0;backdrop-filter:blur(2px);z-index:8}
+#benchOv .card{width:min(430px,88%);background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px;box-shadow:0 18px 50px #0009}
+#benchOv .ttl{font-size:13px;color:var(--acc);letter-spacing:1px;margin-bottom:10px}
+#benchOv .bar{height:6px;background:#0b0f16;border-radius:4px;overflow:hidden;margin-bottom:12px}
+#benchOv .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--acc),var(--ok));transition:width .5s}
+#benchOv .res{font-size:12px;color:var(--txt);min-height:120px}
+#benchOv .ph{color:var(--dim);font-size:12px}
+#benchOv .row{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px dashed #222b3a}
+#benchOv .row span{color:var(--dim)}
+#benchOv .score{font-size:34px;font-weight:700;color:var(--acc);text-align:center;margin-top:12px;letter-spacing:1px}
+#benchOv .sl{font-size:10.5px;color:var(--dim);text-align:center;margin-top:2px}
+#benchOv button{margin-top:14px;width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--txt);cursor:pointer;font-size:12px}
+#benchOv button:hover{border-color:var(--acc);color:var(--acc)}
 #viewBar{position:absolute;top:8px;right:10px;display:flex;gap:6px;z-index:5}
 #viewBar button{background:#141c2acc;color:var(--dim);border:1px solid var(--line);border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;backdrop-filter:blur(4px)}
 #viewBar button:hover{color:var(--acc);border-color:var(--acc)}
+#viewBar button.off{color:#6b7a90;border-color:#39465c;background:#0f141ccc;cursor:not-allowed}
+#viewBar button.off:hover{color:#8b98ab;border-color:#39465c}
+/* 3D 不可用时的就地诊断面板（替代原来那句没信息量的 alert） */
+.notice3d{position:absolute;left:10px;top:10px;max-width:min(600px,calc(100% - 20px));background:#2a1216;border:1px solid var(--err);border-radius:10px;padding:10px 12px;z-index:7;box-shadow:0 8px 24px #0008}
+.notice3d b{color:var(--err);font-size:12px;letter-spacing:.5px}
+.notice3d pre{margin-top:6px;font:11.5px/1.65 Consolas,"Microsoft YaHei",monospace;color:#e2cdd1;white-space:pre-wrap;word-break:break-word}
 #hint3d{position:absolute;left:10px;bottom:8px;font-size:10.5px;color:#5c6b82;z-index:5;pointer-events:none}
 ::-webkit-scrollbar{width:8px}::-webkit-scrollbar-thumb{background:#2c3749;border-radius:4px}
 </style>
@@ -131,7 +162,15 @@ footer{display:flex;align-items:center;gap:16px;padding:12px 16px;background:var
       </div>
       <svg id="caseSVG" viewBox="0 0 760 560"></svg>
       <div id="case3d">
-        <div id="hint3d">拖拽旋转视角・滚轮缩放・双击开合玻璃侧盖・点击配件拆除（或拖出机箱外）</div>
+        <div id="hint3d">拖动旋转视角・滚轮缩放・点玻璃开合侧盖・点配件移除・拖出机箱外也拆・点台面上的零件装回</div>
+        <div id="benchOv">
+          <div class="card">
+            <div class="ttl">StrataBench 跑分</div>
+            <div class="bar"><i></i></div>
+            <div class="res"></div>
+            <button id="benchClose">关闭</button>
+          </div>
+        </div>
       </div>
     </div>
     <div id="status"></div>
@@ -143,6 +182,7 @@ footer{display:flex;align-items:center;gap:16px;padding:12px 16px;background:var
 
 <footer>
   <button id="bootBtn" disabled>启动</button>
+  <button id="benchBtn" disabled>跑分</button>
   <div id="bootLog">把配件拖进机箱 → 基本件齐全（CPU/主板/内存/散热/电源/SSD/机箱 + 显示输出）才能点亮。<br>配件从机箱拖出即拆除。机箱内点击配件也可退回货架。</div>
   <div id="hint">💡 拖拽装配。注意：主板第二槽的电气规格（CPU直连x8 vs 芯片组x4）决定 Strata 副卡 pcie_frac——4070S 的教训会在这里重演。</div>
 </footer>

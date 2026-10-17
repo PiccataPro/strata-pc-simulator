@@ -17,9 +17,12 @@ window.STRATA_ASSETS = {
    * 只覆盖"无动画依赖"的类别（显卡/CPU/电源）：主板 PCIe 槽 frac 色条、
    * 内存 RGB 呼吸、散热风扇旋转是模拟器教学动画核心，保留程序化建模。 */
   parts: {
-    'rtx-3080-20g': { glb: 'gpu_rtx3080_20g.glb' },
-    'rtx-3080-10g': { glb: 'gpu_rtx3080_20g.glb' },
-    'rtx-4070s':    { glb: 'gpu_rtx4070s.glb' },
+    /* 显卡白模按旧版（错误）朝向标定：旧版把卡厚当 X、卡高当 Y，缩放盒是 34×60×309。
+       现在 3d.js 的程序化显卡已按真实朝向重建（112 高×厚×长，且过 npm run audit 校验），
+       白模套进去会被拉歪。要启用就去掉 noGlb，并按新 fitBox(112 × th × len) 重新标定模型。 */
+    'rtx-3080-20g': { noGlb: true },
+    'rtx-3080-10g': { noGlb: true },
+    'rtx-4070s':    { noGlb: true },
     'i7-14700':     { glb: 'cpu_lga1700.glb' },
     'i7-12700KF':   { glb: 'cpu_lga1700.glb' },
     'psu-1250t':    { glb: 'psu_atx.glb' },
