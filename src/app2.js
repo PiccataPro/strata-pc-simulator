@@ -163,6 +163,14 @@ function shutdown() {
 }
 document.getElementById('bootBtn').addEventListener('click', () => { if (!running) boot(); else shutdown(); });
 
+/* 运行中切换语言时，启动按钮的文案由这里兜底：onChange 只在停机时改它 */
+window.syncBootLabels = function () {
+  const b = document.getElementById('bootBtn');
+  if (!b) return;
+  if (running) { b.textContent = L('停止','Stop'); b.title = L('点击停止仿真','Click to stop the simulation'); }
+  else { b.textContent = L('启动','Power on'); b.title = ''; }
+};
+
 /* ---- StrataBench 跑分：一段有仪式感的序列 + 结果卡 ---- */
 let benchGen = 0;
 function brow(k, v) { return '<div class="row"><span>' + k + '</span><b>' + v + '</b></div>'; }

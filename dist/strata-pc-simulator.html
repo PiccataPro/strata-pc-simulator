@@ -331,6 +331,8 @@ footer{display:flex;align-items:center;gap:16px;padding:12px 16px;background:var
       else if (typeof window.renderDash === 'function') window.renderDash();
       if (typeof window.applyView === 'function') window.applyView();
       if (typeof window.mark3dState === 'function') window.mark3dState();
+      if (typeof window.syncBootLabels === 'function') window.syncBootLabels();
+      if (typeof window.syncBenchBtn === 'function') window.syncBenchBtn();
       if (typeof window.setLangHooks === 'function') window.setLangHooks();
     } catch (e) { console.error('lang rerender', e); }
   }
@@ -1675,6 +1677,14 @@ function shutdown() {
   onChange(); // 按钮/风扇/读数回到未运行态
 }
 document.getElementById('bootBtn').addEventListener('click', () => { if (!running) boot(); else shutdown(); });
+
+/* 运行中切换语言时，启动按钮的文案由这里兜底：onChange 只在停机时改它 */
+window.syncBootLabels = function () {
+  const b = document.getElementById('bootBtn');
+  if (!b) return;
+  if (running) { b.textContent = L('停止','Stop'); b.title = L('点击停止仿真','Click to stop the simulation'); }
+  else { b.textContent = L('启动','Power on'); b.title = ''; }
+};
 
 /* ---- StrataBench 跑分：一段有仪式感的序列 + 结果卡 ---- */
 let benchGen = 0;

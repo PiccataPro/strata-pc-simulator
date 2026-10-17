@@ -39,6 +39,8 @@
       else if (typeof window.renderDash === 'function') window.renderDash();
       if (typeof window.applyView === 'function') window.applyView();
       if (typeof window.mark3dState === 'function') window.mark3dState();
+      if (typeof window.syncBootLabels === 'function') window.syncBootLabels();
+      if (typeof window.syncBenchBtn === 'function') window.syncBenchBtn();
       if (typeof window.setLangHooks === 'function') window.setLangHooks();
     } catch (e) { console.error('lang rerender', e); }
   }
