@@ -1,0 +1,1066 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Strata 装机模拟器 · 写实版</title>
+<style>
+:root{
+  --bg:#0d1117; --panel:#161b22; --panel2:#1c2330; --line:#2d3646; --txt:#dbe4f0; --dim:#8b98ab;
+  --acc:#3fb6ff; --ok:#3fd68f; --warn:#ffb454; --err:#ff5d6c; --gpu:#ff4d6d; --cpu:#3fb6ff; --ram:#b98cff; --ssd:#54d6c8; --psu:#ffd166; --cool:#7fd1ff; --mobo:#9aa7b8; --case2:#232b3a;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--txt);font:13px/1.5 "Segoe UI","Microsoft YaHei",sans-serif;min-width:1280px}
+h1{font-size:16px;letter-spacing:1px}
+header{display:flex;align-items:center;gap:14px;padding:10px 16px;background:linear-gradient(90deg,#10151f,#182234);border-bottom:1px solid var(--line)}
+header .tag{font-size:11px;color:var(--dim)}
+/* ---- 顶部 Strata 设置条 ---- */
+#strataBar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+#strataBar label{font-size:12px;color:var(--dim);display:flex;flex-direction:column;gap:2px}
+#strataBar select,#strataBar input[type=range]{background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:3px 6px;font-size:12px}
+#strataBar .val{color:var(--acc);font-weight:600;font-size:12px}
+#strataBar .chk{flex-direction:row;align-items:center;gap:5px;color:var(--txt);font-size:12px;padding-top:14px}
+/* ---- 三栏布局 ---- */
+#main{display:grid;grid-template-columns:270px 1fr 270px;gap:10px;padding:10px 16px}
+.shelf{display:flex;flex-direction:column;gap:8px;max-height:calc(100vh - 210px);overflow-y:auto;padding-right:4px}
+.shelf h3{font-size:12px;color:var(--dim);border-left:3px solid var(--acc);padding-left:6px;margin-top:4px}
+.part{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:7px 9px;cursor:grab;user-select:none;transition:.15s}
+.part:hover{border-color:var(--acc);transform:translateY(-1px)}
+.part .nm{font-size:12px;font-weight:600}
+.part .sp{font-size:10.5px;color:var(--dim);margin-top:2px}
+.part .pr{font-size:11px;color:var(--warn);float:right}
+.part.inuse{opacity:.35;pointer-events:none}
+.part.cat-cpu{border-left:3px solid var(--cpu)} .part.cat-mobo{border-left:3px solid var(--mobo)}
+.part.cat-ram{border-left:3px solid var(--ram)} .part.cat-gpu{border-left:3px solid var(--gpu)}
+.part.cat-ssd{border-left:3px solid var(--ssd)} .part.cat-psu{border-left:3px solid var(--psu)}
+.part.cat-cooler{border-left:3px solid var(--cool)} .part.cat-case{border-left:3px solid #6b7a90}
+/* ---- 中间机箱 ---- */
+#center{display:flex;flex-direction:column;gap:8px}
+#caseWrap{position:relative;background:linear-gradient(160deg,#141a26,#0c1017);border:1px solid var(--line);border-radius:14px;padding:12px;min-height:560px}
+#caseSVG{width:100%;height:auto;display:block}
+.slot{stroke:#39465c;stroke-width:1.5;fill:#10161f;transition:.2s}
+.slot.ok{stroke:var(--ok);fill:#12251c}
+.slot.bad{stroke:var(--err);fill:#2a1216}
+.slot.hot{stroke:var(--acc);stroke-dasharray:5 3;animation:pulse 1s infinite}
+@keyframes pulse{50%{stroke-opacity:.3}}
+.slotLabel{fill:#5c6b82;font-size:11px;font-family:inherit}
+.partBox{cursor:grab}
+.partBox text{font-family:inherit}
+.fan{transform-origin:center;transform-box:fill-box}
+.spinning{animation:spin 1.2s linear infinite}
+.spinning.fast{animation-duration:.45s}
+@keyframes spin{to{transform:rotate(360deg)}}
+.cable{stroke-dasharray:300;stroke-dashoffset:300;opacity:0}
+.cable.done{stroke-dashoffset:0;opacity:1}
+.cable.plug{animation:plug 1.1s ease forwards}
+@keyframes plug{to{stroke-dashoffset:0;opacity:1}}
+.led{opacity:0}.led.on{opacity:1;animation:blink 2.4s infinite}
+@keyframes blink{50%{opacity:.55}}
+.glow{filter:drop-shadow(0 0 6px currentColor)}
+/* ---- 状态/警告 ---- */
+#status{display:flex;gap:8px;flex-wrap:wrap}
+.msg{font-size:11.5px;padding:4px 9px;border-radius:6px;border:1px solid}
+.msg.e{border-color:var(--err);color:var(--err);background:#2a1216}
+.msg.w{border-color:var(--warn);color:var(--warn);background:#2a2213}
+.msg.i{border-color:var(--acc);color:var(--acc);background:#12202b}
+/* ---- 读数面板 ---- */
+#readouts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.ro{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.ro h4{font-size:11px;color:var(--dim);margin-bottom:4px}
+.ro .big{font-size:14px;font-weight:600}
+.bar{height:7px;background:#0b0f16;border-radius:4px;overflow:hidden;margin-top:4px}
+.bar i{display:block;height:100%;border-radius:4px;transition:width .6s,background .6s}
+/* ---- 仪表盘 ---- */
+#dash{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.gauge{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px;text-align:center}
+.gauge .v{font-size:22px;font-weight:700;color:var(--acc)}
+.gauge .u{font-size:10px;color:var(--dim)}
+.gauge .t{font-size:11px;color:var(--dim);margin-bottom:2px}
+.gauge.hot .v{color:var(--err)}
+.gauge.warm .v{color:var(--warn)}
+/* ---- 底部按钮 ---- */
+footer{display:flex;align-items:center;gap:16px;padding:12px 16px;background:var(--panel);border-top:1px solid var(--line);position:sticky;bottom:0}
+#bootBtn{width:92px;height:92px;border-radius:50%;border:3px solid #2c3a52;background:radial-gradient(circle at 35% 30%,#25324a,#131a28);color:#4d5f7e;font-size:13px;font-weight:700;cursor:pointer;transition:.25s;letter-spacing:2px}
+#bootBtn.ready{border-color:var(--ok);color:var(--ok);box-shadow:0 0 22px #3fd68f44}
+#bootBtn.running{border-color:var(--acc);color:var(--acc);box-shadow:0 0 30px #3fb6ff66;animation:pulse 1.6s infinite}
+#bootBtn:disabled{cursor:not-allowed}
+#bootLog{flex:1;font-size:12px;color:var(--dim);max-height:86px;overflow-y:auto;background:#0b0f16;border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-family:Consolas,monospace}
+#bootLog .l-ok{color:var(--ok)}#bootLog .l-err{color:var(--err)}#bootLog .l-w{color:var(--warn)}
+#hint{font-size:11px;color:var(--dim);max-width:260px}
+/* 拖出提示 */
+#caseWrap.dragover{outline:2px dashed var(--acc);outline-offset:-6px}
+/* ---- 3D 视图 ---- */
+#case3d{display:none;width:100%;height:560px;border-radius:10px;overflow:hidden;position:relative}
+#case3d canvas{display:block;width:100%;height:100%}
+#viewBar{position:absolute;top:8px;right:10px;display:flex;gap:6px;z-index:5}
+#viewBar button{background:#141c2acc;color:var(--dim);border:1px solid var(--line);border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;backdrop-filter:blur(4px)}
+#viewBar button:hover{color:var(--acc);border-color:var(--acc)}
+#hint3d{position:absolute;left:10px;bottom:8px;font-size:10.5px;color:#5c6b82;z-index:5;pointer-events:none}
+::-webkit-scrollbar{width:8px}::-webkit-scrollbar-thumb{background:#2c3749;border-radius:4px}
+</style>
+</head>
+<body>
+<header>
+  <h1>⬢ STRATA 装机模拟器</h1>
+  <span class="tag">Qwen3.8-Flash-Next 125B MoE · 专家缓存分层仿真 · 数据锚定 2026-10 实测（本机 + 官方 bench）</span>
+</header>
+
+<div id="strataBar">
+  <label>权重档位<select id="sModel"></select></label>
+  <label>上下文长度 <span class="val" id="vCtx"></span><input type="range" id="sCtx" min="8" max="256" step="8" value="256"></label>
+  <label>并发路数 <span class="val" id="vConc"></span><input type="range" id="sConc" min="1" max="8" value="1"></label>
+  <label>思考强度<select id="sThink">
+    <option value="light">light（少思考快出）</option>
+    <option value="balanced" selected>balanced（均衡）</option>
+    <option value="deep">deep（深度思考）</option>
+  </select></label>
+  <label class="chk"><input type="checkbox" id="sIgpu">核显输出（独卡纯计算化）</label>
+  <label class="chk"><input type="checkbox" id="sHelper">helper-cache 模式</label>
+  <span style="flex:1"></span>
+  <span class="tag" id="priceTag"></span>
+</div>
+
+<div id="main">
+  <div class="shelf" id="shelfL"></div>
+  <div id="center">
+    <div id="caseWrap">
+      <svg id="caseSVG" viewBox="0 0 760 560"></svg>
+      <div id="case3d">
+        <div id="viewBar">
+          <button id="btnDoor" style="display:none">🚪 开/关侧盖</button>
+          <button id="btnReset" style="display:none">🎯 复位视角</button>
+          <button id="btnView">⇄ 切到 3D</button>
+        </div>
+        <div id="hint3d">拖拽旋转视角・滚轮缩放・双击开合玻璃侧盖・点击配件拆除（或拖出机箱外）</div>
+      </div>
+    </div>
+    <div id="status"></div>
+    <div id="readouts"></div>
+    <div id="dash"></div>
+  </div>
+  <div class="shelf" id="shelfR"></div>
+</div>
+
+<footer>
+  <button id="bootBtn" disabled>启动</button>
+  <div id="bootLog">把配件拖进机箱 → 基本件齐全（CPU/主板/内存/散热/电源/SSD/机箱 + 显示输出）才能点亮。<br>配件从机箱拖出即拆除。机箱内点击配件也可退回货架。</div>
+  <div id="hint">💡 拖拽装配。注意：主板第二槽的电气规格（CPU直连x8 vs 芯片组x4）决定 Strata 副卡 pcie_frac——4070S 的教训会在这里重演。</div>
+</footer>
+
+<script>
+/* ============================================================
+ * Strata 装机模拟器 — 配件数据库 + 兼容性/装配矩阵
+ * 数据依据（2026-10-17）：
+ *  - 本机实测：Q4调优报告、strata-ud-q4_k_xl 压测（2026-10-16）、refs/hardware-strata.md
+ *  - Strata 官方：docs/DETAILS.md（PCIe 自动探测 24.3GB/s→frac0.55 / 6.6GB/s→frac0.18；
+ *    issue #448 槽位警告；AVX-512 "a bit faster"；AVX-VNNI +4-25%）
+ *  - 官方社区 bench：2x PRO 4500（issue#776 batch）、rtx3090-epyc-milan、issue #498 双24G
+ *  - 闲鱼 2026-10-16 行情（vramglass + 实地成交价）
+ *  - 2026-10-17 复核二手成交价：内存史诗级涨价（DRAM合约价环比+93%，二手DDR5 32G涨过二手显卡，
+ *    smzdm/搜狐/头条 10月报道）；CPU按getpcparts/aiqicha/头条AM5指南校准；散热/机箱二手不受存储涨价影响
+ * ============================================================ */
+(function (root, factory) {
+  if (typeof module !== 'undefined' && module.exports) module.exports = factory();
+  else root.STRATA_PARTS = factory();
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  const GBPS_PER_LANE = { 3: 0.985, 4: 1.969, 5: 3.94 }; // GB/s per PCIe lane（有效载荷）
+
+  /* ---------------- CPU ----------------
+   * thr=逻辑线程; simd: 512=AVX-512, vnni=AVX-VNNI, avx2=纯AVX2
+   * igpu: 'none' 无核显 / 型号（可承担桌面输出→独卡纯计算化）
+   * lanes/gen: CPU 直连 PCIe；chipsetLanes: 芯片组附加通道
+   * price: 闲鱼/散片 2026-10 参考（元） */
+  const cpus = [
+    { id:'i5-12400',    cat:'cpu', name:'i5-12400',              socket:'LGA1700', p:6,  pt:12, e:0,  et:0,  thr:12, simd:'vnni', igpu:'UHD730',        pcie:{lanes:16, gen:5}, ddr:['4','5'], memMax:128, tdp:65, pl2:117,  price:600,  note:'6P无E核，并发弱；带核显' },
+    { id:'i7-12700KF',  cat:'cpu', name:'i7-12700KF',            socket:'LGA1700', p:8,  pt:16, e:4,  et:4,  thr:20, simd:'vnni', igpu:'none',          pcie:{lanes:16, gen:5}, ddr:['4','5'], memMax:128, tdp:125, pl2:190, price:1400, note:'现机U。8P+4E/20T，无核显（亮机须独卡）' },
+    { id:'i7-14700',    cat:'cpu', name:'i7-14700（非K）',        socket:'LGA1700', p:8,  pt:16, e:12, et:12, thr:28, simd:'vnni', igpu:'UHD770',        pcie:{lanes:16, gen:5}, ddr:['4','5'], memMax:128, tdp:65, pl2:212,  price:2100, note:'方案E核心：8P+12E/28T，UHD770核显输出→双卡纯计算；非K 65W档缩缸风险最低，BIOS须含0x129/0x12B微码' },
+    { id:'i9-14900KF',  cat:'cpu', name:'i9-14900KF',            socket:'LGA1700', p:8,  pt:16, e:16, et:16, thr:32, simd:'vnni', igpu:'none',          pcie:{lanes:16, gen:5}, ddr:['4','5'], memMax:128, tdp:125, pl2:253, price:2200, note:'13/14代缩缸高压档，二手风险高。贩子集体拒收13/14代i9（NGA 10-07），二手压价' },
+    { id:'r7-7700',     cat:'cpu', name:'Ryzen 7 7700',          socket:'AM5',     p:8,  pt:16, e:0,  et:0,  thr:16, simd:'512',  igpu:'Radeon 680M',   pcie:{lanes:24, gen:5}, ddr:['5'],     memMax:192, tdp:65, pl2:88,  price:1100, note:'AM5入门，AVX-512' },
+    { id:'r9-9900X',    cat:'cpu', name:'Ryzen 9 9900X',         socket:'AM5',     p:12, pt:24, e:0,  et:0,  thr:24, simd:'512',  igpu:'Radeon 680M',   pcie:{lanes:24, gen:5}, ddr:['5'],     memMax:256, tdp:120, pl2:162, price:1950, note:'12C24T AVX-512' },
+    { id:'r9-9950X',    cat:'cpu', name:'Ryzen 9 9950X',         socket:'AM5',     p:16, pt:32, e:0,  et:0,  thr:32, simd:'512',  igpu:'Radeon 680M',   pcie:{lanes:24, gen:5}, ddr:['5'],     memMax:256, tdp:170, pl2:200, price:2500, note:'方案F核心：16C32T，AVX-512激活Strata expert kernel（官方口径 a bit faster），无缩缸史，AM5可续Zen6。闲鱼/散片~¥2,500（头条10月AM5指南口径）' },
+    { id:'epyc-7453',   cat:'cpu', name:'EPYC 7453（Milan）',    socket:'SP3',     p:28, pt:56, e:0,  et:0,  thr:56, simd:'avx2', igpu:'aspeed',        pcie:{lanes:128,gen:4}, ddr:['4'],     memMax:2048,tdp:155, pl2:210, price:1600, note:'官方bench反证机：无AVX-512纯AVX2，双3090照样64-78 t/s——CPU不是瓶颈' },
+  ];
+
+  /* ---------------- 主板 ----------------
+   * slots: 物理PCIe卡槽（pos=物理槽序, lanes=电气, src=cpu|chipset, gen）
+   * 关键事实（实地拆机确认）：现板 Z790 GAMING PLUS 物理只有 2 个可用卡位，
+   * 且第二槽走芯片组 x4 —— 这就是 4070S pcie_frac 0.18 的根因
+   * m2Share: 通道共享坑（插M.2_x第二槽降x4） */
+  const mobos = [
+    { id:'z790-gaming-plus', cat:'mobo', name:'微星 Z790 GAMING PLUS WIFI', socket:'LGA1700', ddr:'5', form:'ATX',
+      slots:[{pos:1,lanes:16,src:'cpu',gen:4},{pos:4,lanes:4,src:'chipset',gen:4}], dual:[16,4], slotsTotal:2,
+      m2:3, m2Share:null, memSlots:4, chipLanes:12, price:900,
+      note:'现板。只有2个卡位；第二槽=芯片组x4（6.6GB/s→frac0.18），双卡必踩坑' },
+    { id:'z790-taichi', cat:'mobo', name:'华擎 Z790 Taichi', socket:'LGA1700', ddr:'5', form:'ATX',
+      slots:[{pos:1,lanes:16,src:'cpu',gen:5},{pos:4,lanes:8,src:'cpu',gen:5}], dual:[8,8], slotsTotal:3,
+      m2:3, m2Share:null, memSlots:4, chipLanes:12, price:2100,
+      note:'方案E/D配套：双卡 CPU直连 x8/x8 Gen5（各31.5GB/s→frac满分）；二手¥1,800-2,400' },
+    { id:'z790-meg-ace', cat:'mobo', name:'微星 MEG Z790 ACE', socket:'LGA1700', ddr:'5', form:'ATX',
+      slots:[{pos:1,lanes:16,src:'cpu',gen:5},{pos:4,lanes:8,src:'cpu',gen:5}], dual:[8,8], slotsTotal:3,
+      m2:4, m2Share:null, memSlots:4, chipLanes:12, price:2400,
+      note:'同Taichi：x8/x8 CPU直连；二手¥2,000-2,600' },
+    { id:'b760m-mortar', cat:'mobo', name:'微星 B760M 迫击炮', socket:'LGA1700', ddr:'5', form:'mATX',
+      slots:[{pos:1,lanes:16,src:'cpu',gen:4},{pos:2,lanes:4,src:'chipset',gen:3}], dual:[16,4], slotsTotal:2,
+      m2:2, m2Share:null, memSlots:4, chipLanes:8, price:400,
+      note:'性价比板但双卡第二槽=芯片组x4 Gen3（3.9GB/s，比现板还慢一半）' },
+    { id:'x670e-evo', cat:'mobo', name:'华硕 ROG X670E-E GAMING', socket:'AM5', ddr:'5', form:'ATX',
+      slots:[{pos:1,lanes:16,src:'cpu',gen:5},{pos:4,lanes:8,src:'cpu',gen:5}], dual:[8,8], slotsTotal:3,
+      m2:4, m2Share:null, memSlots:4, chipLanes:12, price:2300,
+      note:'方案F核心：X670E/X870E才有CPU直连x8/x8第二槽——普通B650/B850第二槽是芯片组x4（同现板坑）' },
+    { id:'x870e-creator', cat:'mobo', name:'华硕 ProArt X870E-CREATOR', socket:'AM5', ddr:'5', form:'ATX',
+      slots:[{pos:1,lanes:16,src:'cpu',gen:5},{pos:4,lanes:8,src:'cpu',gen:5}], dual:[16,4],  // ProArt: 双卡时第二槽不拆x8而是维持x16+共享（实际手册：x16/x4或x8/x8可选，默认BIOS x8/x8需手动开bifurcation） slotsTotal:2,
+      m2:2, m2Share:{m2:'M.2_2', slot:4, toLanes:4}, memSlots:4, chipLanes:12, price:2500,
+      note:'隐藏坑：装第二个M.2后第二槽x8→x4（装机模拟器专门复现这个bug给你看）' },
+    { id:'b650m-pro', cat:'mobo', name:'微星 B650M PRO', socket:'AM5', ddr:'5', form:'mATX',
+      slots:[{pos:1,lanes:16,src:'cpu',gen:4},{pos:2,lanes:4,src:'chipset',gen:4}], dual:[16,4], slotsTotal:2,
+      m2:2, m2Share:null, memSlots:2, chipLanes:8, price:500,
+      note:'AMD也有坑板：第二槽芯片组x4——"AMD大多支持双x8+x8"是误解，只有E级板才是' },
+    { id:'trx40', cat:'mobo', name:'TRX40（线程撕裂者）', socket:'TRX4', ddr:'4', form:'E-ATX',
+      slots:[{pos:1,lanes:16,src:'cpu',gen:4},{pos:3,lanes:16,src:'cpu',gen:4},{pos:5,lanes:8,src:'cpu',gen:4}], dual:[16,16,8], slotsTotal:5,
+      m2:3, m2Share:null, memSlots:8, chipLanes:0, price:2600,
+      note:'HEDT：三卡x16/x16/x8全CPU直连，但DDR4平台+EPYC/TR贵、单核弱' },
+  ];
+
+  /* ---------------- 内存条（单条） ----------------
+   * AM5 官方内存模型：2DPC 双条可 6000+，四条降 3600（带宽敏感负载致命）
+   * Intel Z790 四条：降 4000-4400（混插更低） */
+  const dimms = [
+    { id:'d4-16-3200', cat:'ram', name:'DDR4 16G 3200',  gen:'4', size:16, mt:3200,  price:550, note:'DDR4合约价+24%三个月，华强北新条最低600+' },
+    { id:'d4-32-3600', cat:'ram', name:'DDR4 32G 3600',  gen:'4', size:32, mt:3600,  price:1050 },
+    { id:'d5-16-5600', cat:'ram', name:'DDR5 16G 5600',  gen:'5', size:16, mt:5600,  price:850, note:'全新已~¥900（百脑汇10月），二手略低' },
+    { id:'d5-24-6000', cat:'ram', name:'DDR5 24G 6000',  gen:'5', size:24, mt:6000,  price:1300 },
+    { id:'d5-32-5200', cat:'ram', name:'DDR5 32G 5200（KF552C40）', gen:'5', size:32, mt:5200, price:1500, note:'现机同款——96G=16+32+16+32 混插，可平移AM5。⚠2026-10内存史诗级涨价：二手32G涨过二手显卡（smzdm 10-12）' },
+    { id:'d5-32-6000', cat:'ram', name:'DDR5 32G 6000',  gen:'5', size:32, mt:6000,  price:1600 },
+    { id:'d5-48-6400', cat:'ram', name:'DDR5 48G 6400',  gen:'5', size:48, mt:6400,  price:2400 },
+  ];
+
+  /* ---------------- 显卡 ----------------
+   * bw=显存带宽GB/s; sm; tdp; thick=占用槽厚; len=长度mm; conn=供电接口
+   * pcieGen/lanesNeed; mod=魔改卡（无保/按耗材定价）; benchNote=社区/本机实测锚点
+   * 价格：闲鱼 2026-10-16（vramglass + 实地成交价） */
+  const gpus = [
+    { id:'rtx-3080-10g', cat:'gpu', name:'RTX 3080 10G',        vram:10, bw:760,  sm:68, arch:'ampere',  gen:4, lanes:16, tdp:320, thick:2,   len:300, conn:'8pin x2',     price:2100,  benchNote:'' },
+    { id:'rtx-3080-20g', cat:'gpu', name:'RTX 3080 20G 魔改',    vram:20, bw:760,  sm:68, arch:'ampere',  gen:4, lanes:16, tdp:370, thick:2.5, len:310, conn:'8pin x2',     price:3800,  mod:true,
+      benchNote:'本机主卡实测：layer-split K=35、expert arena 71.7G、x4副卡时 decode 50-56.7 t/s' },
+    { id:'rtx-3090',     cat:'gpu', name:'RTX 3090 24G',         vram:24, bw:936,  sm:82, arch:'ampere',  gen:4, lanes:16, tdp:350, thick:3,   len:313, conn:'12pin(转接)', price:8100,
+      benchNote:'官方bench 2026-09-29-epyc-milan：双3090 UD-Q4 64-78 t/s（AVX2 CPU不拖后腿）；闲鱼10-16 ¥8,100（24h -6.9%）' },
+    { id:'rtx-2080ti-22g', cat:'gpu', name:'RTX 2080 Ti 22G 魔改', vram:22, bw:616, sm:68, arch:'turing', gen:3, lanes:16, tdp:260, thick:2.5, len:270, conn:'8pin x2',    price:2600,  mod:true,
+      benchNote:'官方bench 2x2080Ti：比本机现配还慢——明确不推荐' },
+    { id:'rtx-4070s',    cat:'gpu', name:'RTX 4070 SUPER 12G',   vram:12, bw:504,  sm:71, arch:'ada',     gen:4, lanes:16, tdp:220, thick:2.5, len:300, conn:'16pin',       price:4600,
+      benchNote:'现机副卡。12G小显存锁死prompt chunk（issue#448: 1037槽→chunk≤5632）；实地成交价¥4,600' },
+    { id:'rtx-4090',     cat:'gpu', name:'RTX 4090 24G',         vram:24, bw:1008, sm:128,arch:'ada',     gen:4, lanes:16, tdp:450, thick:3,   len:336, conn:'16pin',       price:23344,
+      benchNote:'闲鱼10-16 ¥23,344两年高位——4.1倍价换不成比例提升，不买' },
+    { id:'rtx-5090',     cat:'gpu', name:'RTX 5090 32G',         vram:32, bw:1792, sm:170,arch:'blackwell',gen:5, lanes:16, tdp:575, thick:3,   len:336, conn:'16pin(12V-2x6)', price:46000,
+      benchNote:'Gen5 x16要128条lane平台才喂得饱；单卡¥46k' },
+    { id:'rtx-pro-4500', cat:'gpu', name:'RTX PRO 4500 Blackwell 32G', vram:32, bw:1296, sm:128, arch:'blackwell', gen:5, lanes:16, tdp:200, thick:2, len:267, conn:'16pin', price:19920,
+      benchNote:'官方社区bench 2026-10-06：双32G experts 100%常驻、issue#776 batch +29%、decode 100+；闲鱼10-16 ¥19,920（24h -15.2%正在跌，可蹲）' },
+    { id:'rtx-a6000',    cat:'gpu', name:'RTX A6000 48G',        vram:48, bw:768,  sm:80, arch:'ampere',  gen:4, lanes:16, tdp:300, thick:2,   len:267, conn:'8pin x1(转)', price:23000,
+      benchNote:'48G大显存但768GB/s带宽一般——容量党路线' },
+  ];
+
+  /* ---------------- SSD ---------------- */
+  const ssds = [
+    { id:'ti600-1t',   cat:'ssd', name:'致态 Ti600 1TB NVMe',    type:'nvme', gen:4, lanes:4, read:5000, tdp:6, price:600, note:'本机C:/G:同款×2——权重流式读不构成瓶颈（实测2.3GB/s SLC内）' },
+    { id:'sn850x-2t',  cat:'ssd', name:'三星 SN850X 2TB',        type:'nvme', gen:4, lanes:4, read:7300, tdp:7, price:1300 },
+    { id:'sn5000-4t',  cat:'ssd', name:'致态 TiPro7100 4TB',     type:'nvme', gen:4, lanes:4, read:7400, tdp:8, price:2600 },
+    { id:'wd43purz-4t',cat:'ssd', name:'西数 HC430 4TB 机械盘',   type:'sata', gen:0, lanes:0, read:175,  tdp:8, price:550, note:'D:/E:同款——机械盘勿放模型热文件（175MB/s会卡权重流式）' },
+  ];
+
+  /* ---------------- 电源 ---------------- */
+  const psus2 = [
+    { id:'psu-750',  cat:'psu', name:'750W 金牌',    w:750,  conn8:4, conn16pin:0, price:300 },
+    { id:'psu-850g', cat:'psu', name:'850W 金牌',    w:850,  conn8:4, conn16pin:1, price:400 },
+    { id:'psu-1000p',cat:'psu', name:'1000W 白金',   w:1000, conn8:6, conn16pin:1, price:750 },
+    { id:'psu-1250t',cat:'psu', name:'1250W 钛金（现机）', w:1250, conn8:8, conn16pin:2, price:1500, note:'带3090(350W)+3080(370W)足够' },
+    { id:'psu-1600', cat:'psu', name:'1600W 钛金',   w:1600, conn8:10,conn16pin:2, price:2200 },
+  ];
+
+  /* ---------------- CPU 散热器 ---------------- */
+  const coolers = [
+    { id:'ag400',    cat:'cooler', name:'利民 AX120 单塔',        cap:180, type:'air', price:60 },
+    { id:'pa120se',  cat:'cooler', name:'利民 PA120 SE 双塔',     cap:260, type:'air', price:120 },
+    { id:'aio360',   cat:'cooler', name:'360mm 一体水冷（现机）',  cap:350, type:'aio', price:400 },
+    { id:'d15',      cat:'cooler', name:'猫头鹰 NH-D15',          cap:280, type:'air', price:380 },
+  ];
+
+  /* ---------------- 机箱 ---------------- */
+  const cases = [
+    { id:'mft3f',  cat:'case', name:'中塔（3前进风扇）',  gpuMaxLen:360, formMax:'ATX',   fans:3, price:200 },
+    { id:'ft7f',   cat:'case', name:'全塔（7风扇风道）',  gpuMaxLen:420, formMax:'E-ATX', fans:7, price:600 },
+  ];
+
+  /* ---------------- 权重档位（Strata 侧设置） ---------------- */
+  const models = [
+    { id:'iq3_s',    name:'IQ3_S 125B（现用, 79G）',            expertG:13.2, q:1.00, totalG:79,   path:'G:\\llm\\Strata-data\\packs\\iq3_s' },
+    { id:'ud_q4',    name:'UD-Q4_K_XL 125B（huihui破限, 104G）', expertG:17.5, q:0.97, totalG:104,  path:'G:\\llm\\dl\\uncensored\\unsloth-UD-Q4_K_XL' },
+    { id:'iq3_xxs',  name:'Swift IQ3_XXS 125B（71G）',           expertG:9.0,  q:1.04, totalG:71 },
+    { id:'iq2_xs',   name:'IQ2_XS 125B（56G）',                  expertG:6.4,  q:1.08, totalG:56 },
+    { id:'q4_27b',   name:'27B Q4_K_M（16G, llama栈）',           expertG:2.2,  q:1.30, totalG:16 },
+  ];
+
+  /* ================= 矩阵规则 ================= */
+
+  function byId(id) {
+    const all = [].concat(cpus, mobos, dimms, gpus, ssds, psus2, coolers, cases);
+    return all.find(p => p.id === id) || null;
+  }
+
+  /* 内存分析：槽位A1A2B1B2、通道、对称性、实际频率（AM5四槽降3600等） */
+  function analyzeRAM(build, mobo, cpu) {
+    const slots = [null, null, null, null];
+    (build.ram || []).forEach((id, i) => { if (i < mobo.memSlots) slots[i] = byId(id); });
+    const filled = slots.filter(Boolean);
+    if (!filled.length) return { slots, total: 0, error: '无内存，无法点亮' };
+    const gen = filled[0].gen;
+    if (filled.some(d => d.gen !== gen)) return { slots, total: filled.reduce((s, d) => s + d.size, 0), error: 'DDR' + gen + '/DDR' + (gen === '4' ? '5' : '4') + ' 混插物理不兼容（防呆口不同位）' };
+    if (!cpu.ddr.includes(gen)) return { slots, total: 0, error: cpu.name + ' 仅支持 ' + cpu.ddr.map(g => 'DDR' + g).join('/') };
+    const sizes = filled.map(d => d.size);
+    const dual = sizes.length >= 2;
+    const symmetric = new Set(sizes).size === 1;
+    let mt = Math.min(...filled.map(d => d.mt));
+    const derates = [];
+    if (filled.length === 4) {
+      const cap = cpu.socket === 'AM5' ? 3600 : (symmetric ? 4400 : 4000);
+      if (mt > cap) { derates.push(filled.length + '条' + (symmetric ? '' : '混插') + '降频→' + cap); mt = cap; }
+    } else if (filled.length === 3) {
+      mt = Math.min(mt, 4800); derates.push('3条非对称→' + mt);
+    }
+    if (!symmetric) derates.push('非对称容量→弹性单/双通道混合，带宽-15%');
+    const bw = dual ? mt * 16 / 1000 : mt * 8 / 1000; // DDR5: 单通道64bit=mt×8，双通道×2
+    const bwEff = bw * (symmetric ? 1 : 0.85);
+    return { slots, total: sizes.reduce((a, b) => a + b, 0), channels: dual ? (symmetric ? 2 : '1.5') : 1, mt, bw: bwEff, derates,
+      symmetric, count: filled.length, warn: derates.length ? derates.join('；') : null };
+  }
+
+  /* PCIe 分配：按主板 bifurcation 规格（dual=双卡时各CPU槽实际lane）
+   * frac 线性映射官方实测锚点：x16Gen4实测24.3GB/s、x4Gen4实测6.6GB/s，/31.5封顶1.0 */
+  function allocPCIe(mobo, gpuCount, ssdList) {
+    const res = [];
+    const cpuSlots = mobo.slots.filter(s => s.src === 'cpu');
+    const cpuAlloc = cpuSlots.map(s => s.lanes);
+    if (gpuCount >= 2 && mobo.dual) {
+      for (let i = 0; i < cpuSlots.length; i++) if (mobo.dual[i] != null) cpuAlloc[i] = mobo.dual[i];
+    }
+    const hasM2share = mobo.m2Share && (ssdList || []).filter(s => s.type === 'nvme').length >= 2;
+    let ci = 0;
+    for (const s of mobo.slots) {
+      let lanes = s.lanes, gen = s.gen, why = [];
+      if (s.src === 'cpu') {
+        lanes = cpuAlloc[ci++];
+        if (mobo.dual && gpuCount >= 2) why.push('双卡 bifurcation：CPU lane 拆分 x' + lanes);
+      } else {
+        why.push('芯片组通道（与USB/SATA/M.2抢带宽）');
+      }
+      if (hasM2share && mobo.m2Share.slot === s.pos && lanes > mobo.m2Share.toLanes) {
+        lanes = mobo.m2Share.toLanes; why.push(mobo.m2Share.m2 + '占用→降x' + lanes);
+      }
+      const measured = lanes * GBPS_PER_LANE[gen]; // 理论带宽（报告口径：x8/x8 Gen5=31.5GB/s=frac满分；x16 Gen4=31.5）
+      const frac = +Math.min(1, measured / 31.5).toFixed(2);
+      res.push({ pos: s.pos, lanes, gen, src: s.src, gbps: +measured.toFixed(1), frac, why: why.join('，') });
+    }
+    return res;
+  }
+
+  /* 整机装配校验：POST 条件 + 兼容矩阵 */
+  function analyze(build, settings) {
+    const errors = [], warns = [], info = [];
+    const cpu = build.cpu ? byId(build.cpu) : null;
+    const mobo = build.mobo ? byId(build.mobo) : null;
+    const psu = build.psu ? byId(build.psu) : null;
+    const cooler = build.cooler ? byId(build.cooler) : null;
+    const kase = build.case ? byId(build.case) : null;
+    const gpuList = (build.gpu || []).map(byId).filter(Boolean);
+    const ssdList = (build.ssd || []).map(byId).filter(Boolean);
+    const ram = mobo && cpu ? analyzeRAM(build, mobo, cpu) : null;
+
+    if (!cpu) errors.push('缺 CPU');
+    if (!mobo) errors.push('缺主板');
+    if (!ram || ram.error) errors.push(ram ? ram.error : '缺内存');
+    if (!psu) errors.push('缺电源');
+    if (!cooler) errors.push('缺 CPU 散热器（无散热器上电=秒缩缸保护关机）');
+    if (!ssdList.length) errors.push('无存储盘（权重在盘上，无法加载）');
+    if (!kase) errors.push('缺机箱');
+
+    if (cpu && mobo && cpu.socket !== mobo.socket) errors.push('插槽不匹配：' + cpu.name + '(' + cpu.socket + ') ≠ ' + mobo.name + '(' + mobo.socket + ')');
+    if (mobo && ram && ram.slots.filter(Boolean).length > mobo.memSlots) errors.push('内存条数超过主板槽数');
+    if (cpu && cooler && cooler.cap < (cpu.pl2||cpu.tdp)) warns.push('散热压不住：' + cooler.name + ' 解热 ' + cooler.cap + 'W < ' + cpu.name + ' PL2 ' + (cpu.pl2||cpu.tdp) + 'W（会撞温度墙降频）');
+    if (mobo && kase && ['ATX', 'E-ATX'].includes(mobo.form) && kase.formMax === 'ATX' && mobo.form === 'E-ATX') errors.push('E-ATX 主板装不进中塔');
+
+    /* 显示输出：无核显且无独卡 → 点不亮（POST 无显示） */
+    const igpuUsable = cpu && cpu.igpu !== 'none';
+    const igpuChosen = settings && settings.igpuDisplay && igpuUsable;
+    if (!gpuList.length && !igpuUsable) errors.push('无独卡且 ' + (cpu ? cpu.name : 'CPU') + ' 无核显——无显示输出点不亮（12700KF/KF 教训）');
+
+    /* PCIe 分配 + 显卡物理/电气 */
+    const pcie = mobo ? allocPCIe(mobo, gpuList.length, ssdList) : [];
+    const gpuAssign = [];
+    if (mobo) {
+      let nextFree = 0;
+      const slotPos = pcie.map(p => p.pos);
+      for (const g of gpuList) {
+        const si = slotPos.findIndex((p, idx) => idx >= nextFree && p >= 1);
+        if (si < 0) { errors.push(g.name + '：主板卡槽已满（' + mobo.name + ' 只有 ' + mobo.slots.length + ' 个可用槽）'); break; }
+        const slot = pcie[si];
+        const prev = gpuAssign[gpuAssign.length - 1];
+        if (prev) {
+          const gap = slot.pos - prev.slotPos;
+          if (gap < prev.thick) errors.push(g.name + ' 装不进：与 ' + prev.name + ' 冲突（需 ' + prev.thick + ' 槽间距，实际 ' + gap + '）');
+        }
+        if (kase && g.len > kase.gpuMaxLen) errors.push(g.name + ' 长 ' + g.len + 'mm 超过机箱限长 ' + kase.gpuMaxLen + 'mm');
+        if (slot.src === 'chipset') warns.push(g.name + ' 在芯片组 x' + slot.lanes + '：' + slot.gbps + 'GB/s → Strata pcie_frac ' + slot.frac + '（4070S 教训，issue#448）');
+        else if (slot.lanes < 8) warns.push(g.name + ' 仅 x' + slot.lanes + '，pcie_frac ' + slot.frac);
+        gpuAssign.push({ ...g, slotPos: slot.pos, slot, thick: g.thick });
+        nextFree = si + 1;
+      }
+      if (gpuList.length > mobo.slots.length) errors.push('显卡数量超过主板槽数');
+    }
+
+    /* 供电 */
+    let load = 150; // 板+内存+盘+风扇基础
+    if (cpu) load += cpu.tdp;
+    gpuAssign.forEach(g => load += g.tdp);
+    let powerOK = true;
+    if (psu) {
+      const need = load / 0.85;
+      if (psu.w < need) { errors.push('电源不足：峰值 ' + load + 'W，建议 ≥' + Math.ceil(need / 50) * 50 + 'W（85% 负载线），当前 ' + psu.name); powerOK = false; }
+      else if (psu.w < load / 0.7) warns.push('电源余量偏紧（负载 >' + Math.round(load / psu.w * 100) + '%）');
+      const need16 = gpuAssign.filter(g => /16pin|12pin/.test(g.conn)).length;
+      if (need16 > psu.conn16pin) warns.push('缺原生 16pin/12pin 接口：需 ' + need16 + ' 个，电源只有 ' + psu.conn16pin + ' 个（用转接线有熔毁风险）');
+    }
+
+    /* 内存带宽对 Strata CPU 侧 expert 的影响 */
+    if (ram && !ram.error) {
+      if (ram.total < 64) warns.push('内存 ' + ram.total + 'G：125B expert arena 装不下（IQ3_S 需 ~72G 全驻），decode 会掉到个位数');
+      else if (ram.total < 96) warns.push('内存 ' + ram.total + 'G：expert arena 部分驻留，长上下文时 RAM 余量吃紧');
+      if (ram.bw < 70) warns.push('内存带宽 ' + Math.round(ram.bw) + 'GB/s 偏低——CPU 侧 expert 计算是带宽敏感负载（AM5 四槽降 3600 的典型代价）');
+    }
+
+    /* 机械盘放权重警告 */
+    if (ssdList.length && ssdList.every(s => s.type === 'sata')) warns.push('权重全在机械盘（175MB/s）：expert 流式加载会卡死 decode，权重必须放 NVMe');
+
+    const canPost = errors.length === 0;
+    return { cpu, mobo, psu, cooler, kase, ram, pcie, gpuAssign, ssdList, errors, warns, info, load, canPost, igpuChosen };
+  }
+
+  return {
+    GBPS_PER_LANE, cpus, mobos, dimms, gpus, ssds, psus: psus2, coolers, cases, models,
+    byId, analyze, analyzeRAM, allocPCIe, 
+  };
+});
+
+</script>
+<script>
+/* ============================================================
+ * Strata 性能仿真引擎 v2（时间模型，双锚点解析解）
+ * 每token解码时间 = VRAM命中计算时间 + RAM未命中经PCIe流式时间 + 盘溢出
+ *   t = fV/(k1·hw) + fR/(k2·pcie_eff)
+ * 解析标定（UD-Q4）：
+ *   锚点A1 现机(3080x16+4070Sx4, hit86.7%, 31t/s) + 锚点A2 双3090x8/x8(hit94%, 70t/s)
+ *   → k1=0.00103, k2=0.00742（两锚点精确复现）
+ * 其余锚点（校验）：
+ *   A3 官方MULTI_GPU.md 双好链路 prefill 1776 / decode ~60
+ *   A4 官方社区 2xPRO4500 32G Swift IQ3_XXS: experts 100%常驻, batch+29%(#776), 100+
+ *   A5 本机10-16压测 64K: prefill 1047, decode 50（上下文短→命中高）
+ *   A6 issue#448: 4070S 1037槽→chunk≤5632
+ *   A7 官方: AVX-512 +5%, AVX-VNNI +12%（只作用于RAM份额）
+ *   A8 本机: arena全驻RAM(87.5→8G); KV int8 256K≈4.5G
+ *   A9 报告预期: 双3090 60-80 / TTFT256K~110s; 双3080 55-70
+ * ============================================================ */
+(function (root, factory) {
+  if (typeof module !== 'undefined' && module.exports) module.exports = factory(require('./parts.js'));
+  else root.STRATA_SIM = factory(root.STRATA_PARTS);
+})(typeof self !== 'undefined' ? self : this, function (P) {
+  'use strict';
+
+  const ARCH_F = { turing: 0.75, ampere: 1.0, ada: 1.05, blackwell: 1.15 };
+  const SIMD_F = { '512': 1.05, vnni: 1.12, avx2: 1.0 };
+  const THINK = { light: { f: 1.06, out: 0.6 }, balanced: { f: 1.0, out: 1.0 }, deep: { f: 0.90, out: 2.2 } };
+  const POOL = { iq3_s: 55, ud_q4: 72, iq3_xxs: 46, iq2_xs: 36, q4_27b: 11 }; // 专家池GiB（UD-Q4实测装载71.73G）
+  const K1 = 0.2618, K2 = 37.6; // 标定常数：A1(现机31t/s)+A2(双3090 70t/s) 联立方程解析解
+  const T_FLOOR = 0.0066; // 全驻留算力上限 ~150 t/s（MTP/投机解码天花板，A4口径100+）
+
+  function slotsOf(vramGiB) { return Math.max(0, Math.round((vramGiB - 2.5) * 109)); } // issue#448锚点
+
+  function simulate(build, st) {
+    const a = P.analyze(build, st);
+    const out = { ok: a.canPost, errors: a.errors, warns: a.warns, hw: a, m: null };
+    if (!a.canPost) return out;
+    if (!a.gpuAssign.length && !(a.cpu.igpu && a.cpu.igpu !== 'none')) return out; // 无显示输出
+
+    const model = P.models.find(x => x.id === st.model) || P.models[1];
+    const pool = POOL[model.id];
+    const ctxK = st.ctx / 1024, conc = st.conc;
+    const think = THINK[st.think] || THINK.balanced;
+    const kvG = ctxK / 256 * 4.5 * conc;
+
+    /* 无独卡核显输出：虚拟"核显卡"（UHD770 ~50GB/s共享带宽，decode个位数） */
+    let cards;
+    if (a.gpuAssign.length) {
+      cards = a.gpuAssign.map((g, i) => {
+        const displayTax = (!a.igpuChosen && i === 0) ? 1.2 : 0;
+        const free = Math.max(0.5, g.vram - 1.0 - 1.5 - displayTax);
+        return { name: g.name, vram: g.vram, free, bw: g.bw, sm: g.sm, frac: g.slot.frac, gbps: g.slot.gbps,
+                 arch: ARCH_F[g.arch] || 1, tdp: g.tdp, slots: slotsOf(g.vram - displayTax), igpu: false };
+      });
+    } else {
+      cards = [{ name: a.cpu.igpu + '（核显输出）', vram: 2, free: 0.5, bw: 50, sm: 8, frac: 1, gbps: 64, arch: 0.5, tdp: a.cpu.tdp, slots: 0, igpu: true }];
+    }
+    cards.forEach(c => { c.kvShare = kvG / cards.length; c.expertBudget = Math.max(0.5, c.free - c.kvShare); });
+
+    /* ---- 三级驻留：VRAM / RAM(PCIe流式) / 盘溢出 ---- */
+    const vramExperts = Math.min(pool, cards.reduce((s, c) => s + c.expertBudget, 0));
+    const ramAvail = Math.max(0, a.ram.total - 12 - kvG); // 系统/桌面/KV 之外可给 arena
+    const ramExperts = Math.min(pool - vramExperts, ramAvail);
+    const diskExperts = pool - vramExperts - ramExperts;
+    const fV = vramExperts / pool, fR = ramExperts / pool, fD = diskExperts / pool;
+    if (diskExperts > 0.5) out.warns.push('⚠ ' + diskExperts.toFixed(1) + 'G expert 溢出到盘（内存装不下 arena）——decode 跌到个位数');
+
+    /* 命中率（引擎口径）：VRAM驻留全命中，RAM驻留命中~0.8（路由尾跳过）——锚点A1: 0.36+0.64×0.8×0.917=0.83≈实测86.7% */
+    const ctxDecay = Math.max(0, ctxK - 32) / 256 * 0.083 + Math.max(0, conc - 1) * 0.02;
+    let hit = Math.max(0.15, Math.min(1, fV + fR * 0.8 * (1 - ctxDecay)));
+
+    /* ---- decode ---- */
+    const dual = cards.length >= 2;
+    let hw;
+    if (dual) {
+      const eff = cards.map(c => c.bw * (0.55 + 0.45 * c.frac) * c.arch).sort((x, y) => x - y);
+      hw = eff[0] * 1.15; // layer-split 流水增益（A3: 16K 1244→1776）
+    } else hw = cards[0].bw * 0.75 * cards[0].arch;
+    const pcieEff = Math.max(0.12, cards.reduce((s, c) => s + c.frac, 0) / cards.length);
+    let t = fV / (K1 * hw) + fR / (K2 * pcieEff) + fD / (K2 * 0.01);
+    let decode = think.f / Math.max(t, T_FLOOR);
+    decode *= 1 + (SIMD_F[a.cpu.simd] - 1) * fR * 1.2; // CPU kernel 只帮 RAM 份额
+    decode *= Math.pow(72 / pool, 0.25);               // 小量化略快
+
+    /* 并发：全VRAM驻留 + Blackwell/Ada → batch 路径（issue#776 +29%） */
+    const batchOK = fV >= 0.95 && cards.some(c => c.arch >= 1.05);
+    let decodePer = decode, decodeTotal = decode;
+    if (conc > 1) {
+      if (batchOK) { decodePer = decode * 0.94; decodeTotal = decodePer * conc * 1.05; }
+      else { decodePer = decode * Math.pow(0.72, conc - 1) * 0.9; decodeTotal = decodePer * conc; }
+    }
+
+    /* ---- prefill（k=9.0：A1锚点1181@256K + A3官方1776双好链路 双标定） ---- */
+    let pf = 9.0 * cards.reduce((s, c) => s + c.sm * (0.55 + 0.45 * c.frac) * c.arch, 0) * (dual ? 1.35 : 1.0);
+    const minSlots = dual ? Math.min(...cards.map(c => c.slots)) : cards[0].slots;
+    const chunkCap = Math.round(minSlots / 0.184); // 5632tok/1037槽 锚点A6
+    const chunkLimited = dual && chunkCap < 12000;
+    /* 长上下文衰减 ∝ chunk 受限程度（现机chunk5630→重衰减；双3090 chunk12.8K→轻衰减，A9: TTFT256K~110-135s） */
+    const sev = chunkLimited ? Math.min(1, (12000 - chunkCap) / 7000) : 0;
+    let pfEff = pf * (1 - Math.max(0, ctxK - 32) / 256 * (0.04 + 0.13 * sev));
+    if (st.helperCache && chunkLimited) pfEff = Math.min(pf * 0.95, pfEff * 1.35); // SECOND_GPU.md
+    const ttft = ctxK * 1024 / pfEff;
+
+    /* ---- 内存 ---- */
+    const ramUsed = 12 + (vramExperts + ramExperts) + kvG + conc * 1.5;
+    const ramFree = a.ram.total - ramUsed;
+
+    /* ---- CPU 负载（本机实测 10.2 逻辑核@并发1含桌面） ---- */
+    let coresUsed = 8 + 2.2 * conc + 4 * fR;
+    coresUsed += a.igpuChosen ? 0.5 : 1.2;
+    coresUsed = Math.min(coresUsed, a.cpu.thr);
+    const cpuLoad = coresUsed / a.cpu.thr;
+
+    /* ---- 温度（环境26°C） ---- */
+    const fans = a.kase ? a.kase.fans : 0;
+    const airflow = 1 - Math.min(0.18, fans * 0.028);
+    const gpuLoad = Math.min(0.99, 0.85 + 0.05 * conc);
+    const temps = {};
+    temps.gpu = cards.map(c => Math.round(26 + (c.tdp / 320) * 44 * gpuLoad * airflow));
+    temps.cpu = Math.round(26 + cpuLoad * 62 * (a.cpu.tdp / Math.min(a.cooler.cap, a.cpu.tdp * 1.4)) * airflow);
+    temps.ram = Math.round(26 + (a.ram.bw > 100 ? 22 : 16) + cpuLoad * 8);
+    temps.ssd = Math.round(26 + (a.ssdList.some(s => s.type === 'nvme') ? 34 : 12) + (diskExperts > 0.5 ? 25 : 0));
+    temps.sys = Math.round((temps.cpu + Math.max(...temps.gpu, 40) * 2 + temps.ram + temps.ssd) / 5);
+
+    /* ---- 功率 ---- */
+    const power = Math.round(100 + a.cpu.tdp * (0.3 + 0.7 * cpuLoad) + cards.reduce((s, c) => s + c.tdp * gpuLoad, 0) + 20 * conc);
+
+    /* ---- 显存占用 ---- */
+    const expertPerCard = Math.min(vramExperts / cards.length, 99);
+    const vramUse = cards.map(c => Math.min(c.vram, +(c.vram - c.free + Math.min(c.expertBudget, expertPerCard) + c.kvShare).toFixed(1)));
+
+    out.m = {
+      model, pool, ctxK, conc, hit, vramExperts: +vramExperts.toFixed(1), ramExperts: +ramExperts.toFixed(1), diskExperts: +diskExperts.toFixed(1),
+      fV, fR, fD, decode: +decodePer.toFixed(1), decodeTotal: +decodeTotal.toFixed(1),
+      prefill: Math.round(pfEff), ttft: Math.round(ttft), kvG: +kvG.toFixed(1),
+      cards, totalVram: cards.reduce((s, c) => s + c.vram, 0),
+      ramTotal: a.ram.total, ramUsed: +ramUsed.toFixed(1), ramFree: +ramFree.toFixed(1),
+      coresUsed: +coresUsed.toFixed(1), cpuLoad, gpuLoad, temps, power,
+      outTokens: Math.round(800 * think.out), chunkCap, chunkLimited, batchOK, dual, vramUse,
+    };
+    return out;
+  }
+
+  return { simulate, POOL, K1, K2 };
+});
+
+</script>
+<script>
+/* ============ Strata 装机模拟器 · 装配与渲染 ============ */
+'use strict';
+const P = window.STRATA_PARTS, S = window.STRATA_SIM;
+
+/* ---- 状态 ---- */
+const build = { cpu: null, mobo: null, ram: [], gpu: [], ssd: [], psu: null, cooler: null, case: null };
+let running = false, phase = 'idle'; // idle|cables|boot|run
+const CATS = [
+  { k: 'cpu', arr: 'cpus', t: 'CPU 处理器' }, { k: 'mobo', arr: 'mobos', t: '主板' }, { k: 'ram', arr: 'dimms', t: '内存条（拖多次=多槽）' },
+  { k: 'gpu', arr: 'gpus', t: '显卡（最多2张）' }, { k: 'ssd', arr: 'ssds', t: 'SSD / 存储' },
+  { k: 'psu', arr: 'psus', t: '电源' }, { k: 'cooler', arr: 'coolers', t: 'CPU 散热器' }, { k: 'case', arr: 'cases', t: '机箱' },
+];
+
+function settings() {
+  return {
+    model: document.getElementById('sModel').value,
+    ctx: +document.getElementById('sCtx').value * 1024,
+    conc: +document.getElementById('sConc').value,
+    think: document.getElementById('sThink').value,
+    igpuDisplay: document.getElementById('sIgpu').checked,
+    helperCache: document.getElementById('sHelper').checked,
+  };
+}
+function totalPrice() {
+  let s = 0;
+  if (build.cpu) s += P.byId(build.cpu).price;
+  if (build.mobo) s += P.byId(build.mobo).price;
+  if (build.psu) s += P.byId(build.psu).price;
+  if (build.cooler) s += P.byId(build.cooler).price;
+  if (build.case) s += P.byId(build.case).price;
+  build.ram.forEach(r => s += P.byId(r).price);
+  build.gpu.forEach(g => s += P.byId(g).price);
+  build.ssd.forEach(x => s += P.byId(x).price);
+  return s;
+}
+
+/* ---- 货架 ---- */
+const MULTI = { ram: 4, gpu: 2, ssd: 4 }; // 可重复装配的品类及上限
+function renderShelves() {
+  /* 单件制品类：装了就置灰；多件制（内存/显卡/SSD）：显示已装×N，到上限才置灰 */
+  const inUse = new Set([build.cpu, build.mobo, build.psu, build.cooler, build.case].filter(Boolean));
+  const cnt = {};
+  [].concat(build.ram, build.gpu, build.ssd).forEach(id => { cnt[id] = (cnt[id] || 0) + 1; });
+  const half = Math.ceil(CATS.length / 2);
+  [[document.getElementById('shelfL'), CATS.slice(0, half)], [document.getElementById('shelfR'), CATS.slice(half)]].forEach(([el, cats]) => {
+    el.innerHTML = '';
+    cats.forEach(c => {
+      const h = document.createElement('h3'); h.textContent = c.t; el.appendChild(h);
+      P[c.arr].forEach(p => {
+        const n = cnt[p.id] || 0, lim = MULTI[c.k];
+        const d = document.createElement('div');
+        d.className = 'part cat-' + c.k + ((inUse.has(p.id) || (lim && n >= lim)) ? ' inuse' : '');
+        d.draggable = true; d.dataset.id = p.id; d.dataset.cat = c.k;
+        const sp = c.k === 'cpu' ? (p.p + 'P' + (p.e ? '+' + p.e + 'E' : '') + '/' + p.thr + 'T · ' + ({ '512': 'AVX-512', vnni: 'AVX-VNNI', avx2: 'AVX2' })[p.simd] + (p.igpu !== 'none' ? ' · 核显' : ' · 无核显'))
+          : c.k === 'mobo' ? (p.socket + ' · DDR' + p.ddr + ' · 槽:' + p.slots.map(s => 'x' + s.lanes + (s.src === 'cpu' ? 'CPU' : '芯')).join('+'))
+          : c.k === 'ram' ? ('DDR' + p.gen + ' ' + p.size + 'G ' + p.mt + 'MT/s')
+          : c.k === 'gpu' ? (p.vram + 'G · ' + p.bw + 'GB/s · SM' + p.sm + ' · ' + p.tdp + 'W' + (p.mod ? ' · 魔改' : ''))
+          : c.k === 'ssd' ? (p.type === 'nvme' ? 'NVMe Gen' + p.gen + ' ' + p.read + 'MB/s' : 'SATA机械 ' + p.read + 'MB/s')
+          : c.k === 'psu' ? (p.w + 'W · 8pin×' + p.conn8 + ' · 16pin×' + p.conn16pin)
+          : c.k === 'cooler' ? ('解热' + p.cap + 'W · ' + (p.type === 'aio' ? '360水冷' : '风冷'))
+          : ('限长' + p.gpuMaxLen + 'mm · ' + p.fans + '风扇');
+        d.innerHTML = '<span class="pr">¥' + p.price.toLocaleString() + (lim && n ? ' <b style="color:#3fd68f">已装×' + n + '/' + lim + '</b>' : '') + '</span><div class="nm">' + p.name + '</div><div class="sp">' + sp + '</div>' + (p.note ? '<div class="sp" style="color:#6fa8dc">📌' + p.note.slice(0, 46) + (p.note.length > 46 ? '…' : '') + '</div>' : '');
+        d.title = p.note || '';
+        d.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', p.id); });
+        d.addEventListener('dblclick', () => install(p.id, p.cat));
+        el.appendChild(d);
+      });
+    });
+  });
+}
+
+/* ---- 装配/拆除 ---- */
+function install(id, cat) {
+  if (cat === 'ram') { if (build.ram.length < 4) build.ram.push(id); }
+  else if (cat === 'gpu') { if (build.gpu.length < 2) build.gpu.push(id); }
+  else if (cat === 'ssd') { if (build.ssd.length < 4) build.ssd.push(id); }
+  else build[cat] = id;
+  onChange();
+}
+function removePart(cat, idx) {
+  if (cat === 'ram' || cat === 'gpu' || cat === 'ssd') build[cat].splice(idx, 1);
+  else build[cat] = null;
+  onChange();
+}
+
+/* ---- 机箱 SVG（写实侧透：主板托盘/PCIe槽/CPU座/内存槽/M.2/电源仓/风扇位） ---- */
+const SLOT_GEO = { // 主板布局：CPU座、内存槽、PCIe槽位（物理槽1-4）
+  mobo: { x: 150, y: 60, w: 380, h: 330 },
+  cpuSock: { x: 250, y: 100, w: 92, h: 92 },
+  ramSlots: [{ x: 400, y: 92 }, { x: 418, y: 92 }, { x: 436, y: 92 }, { x: 454, y: 92 }],
+  pcieSlots: { 1: { x: 175, y: 250, w: 210, h: 26 }, 2: { x: 175, y: 292, w: 150, h: 22 }, 3: { x: 175, y: 322, w: 150, h: 22 }, 4: { x: 175, y: 352, w: 190, h: 26 } },
+  m2: [{ x: 175, y: 285 }, { x: 175, y: 318 }],
+  psuBay: { x: 150, y: 430, w: 380, h: 90 },
+  coolerPos: { x: 236, y: 86 },
+  frontFans: [{ x: 60, y: 110 }, { x: 60, y: 210 }, { x: 60, y: 310 }],
+  rearFan: { x: 552, y: 80 },
+  gpuPos: [{ x: 178, y: 236 }, { x: 178, y: 338 }],
+};
+
+function fanSVG(cx, cy, r, cls, color) {
+  let blades = '';
+  for (let i = 0; i < 7; i++) blades += '<path d="M0,0 Q' + (r * .55) + ',' + (-r * .28) + ' ' + (r * .82 * Math.cos(i * 0.9)) + ',' + (-r * .82 * Math.sin(i * 0.9)) + '" stroke="' + color + '" stroke-width="' + (r * .16) + '" fill="none" stroke-linecap="round" transform="rotate(' + (i * 51.4) + ')"/>';
+  return '<g class="fan ' + cls + '" transform="translate(' + cx + ',' + cy + ')"><circle r="' + (r + 4) + '" fill="#0a0e15" stroke="#39465c" stroke-width="2"/>' +
+    '<circle r="' + r + '" fill="#11161f"/>' + blades + '<circle r="' + (r * .3) + '" fill="#1d2635" stroke="#4a5a74"/>' +
+    '<circle r="' + (r + 4) + '" fill="none" stroke="' + color + '" stroke-width="1" opacity=".5" class="led"/></g>';
+}
+
+function renderCase(a) {
+  const svg = document.getElementById('caseSVG');
+  const G = SLOT_GEO;
+  let s = '';
+  /* 机箱框架 */
+  s += '<rect x="30" y="30" width="620" height="500" rx="16" fill="#151b27" stroke="#3a475c" stroke-width="3"/>';
+  s += '<rect x="42" y="42" width="596" height="476" rx="10" fill="#0e131d" stroke="#232d3f"/>';
+  /* 电源仓隔断 */
+  s += '<rect x="140" y="418" width="410" height="6" fill="#1a2230"/>';
+  /* 主板 */
+  if (build.mobo) {
+    const m = P.byId(build.mobo);
+    s += '<g class="partBox" data-cat="mobo"><rect x="' + G.mobo.x + '" y="' + G.mobo.y + '" width="' + G.mobo.w + '" height="' + G.mobo.h + '" rx="6" fill="#14202e" stroke="#3fd68f" stroke-width="1.5"/>';
+    s += '<text x="' + (G.mobo.x + 8) + '" y="' + (G.mobo.y + 16) + '" fill="#7fd1a0" font-size="11">' + m.name + '（' + m.socket + '）</text>';
+    /* PCIe 槽（电气着色） */
+    a.pcie.forEach(p => {
+      const g = G.pcieSlots[p.pos]; if (!g) return;
+      const col = p.frac >= 0.9 ? '#3fd68f' : p.frac >= 0.5 ? '#ffb454' : '#ff5d6c';
+      s += '<rect x="' + g.x + '" y="' + g.y + '" width="' + g.w + '" height="' + g.h + '" rx="3" fill="#0a0f18" stroke="' + col + '" stroke-width="1.6"/>';
+      s += '<text x="' + (g.x + g.w + 6) + '" y="' + (g.y + 15) + '" fill="' + col + '" font-size="10">槽' + p.pos + ' x' + p.lanes + ' Gen' + p.gen + ' · ' + p.gbps + 'GB/s · frac ' + p.frac + (p.src === 'chipset' ? ' 芯片组' : '') + '</text>';
+    });
+    /* 内存槽 */
+    for (let i = 0; i < m.memSlots; i++) {
+      const g = G.ramSlots[i];
+      const filled = build.ram[i];
+      s += '<rect x="' + g.x + '" y="' + g.y + '" width="10" height="120" rx="2" fill="' + (filled ? '#2a1f45' : '#0a0f18') + '" stroke="' + (filled ? '#b98cff' : '#39465c') + '"' + (filled ? ' class="partBox" data-cat="ram" data-idx="' + i + '"' : '') + '/>';
+    }
+    if (build.ram.length && a.ram && !a.ram.error) {
+      const rr = a.ram;
+      s += '<text x="' + G.ramSlots[0].x + '" y="' + (G.ramSlots[0].y + 136) + '" fill="#b98cff" font-size="10">' + rr.total + 'G ' + (rr.channels === 2 ? '双通道' : rr.channels === 1.5 ? '弹性1.5通道' : '单通道') + ' @' + rr.mt + (rr.derates.length ? ' ⚠' : '') + '</text>';
+    }
+    /* M.2 */
+    build.ssd.forEach((x, i) => {
+      const g = G.m2[i % 2]; const off = i >= 2 ? 24 : 0;
+      s += '<g class="partBox" data-cat="ssd" data-idx="' + i + '"><rect x="' + g.x + '" y="' + (g.y + 30 + off) + '" width="70" height="12" rx="2" fill="#0f2a26" stroke="#54d6c8"/><text x="' + (g.x + 76) + '" y="' + (g.y + 40 + off) + '" fill="#54d6c8" font-size="9">' + P.byId(x).name + '</text></g>';
+    });
+    s += '</g>';
+  } else {
+    s += '<rect x="' + G.mobo.x + '" y="' + G.mobo.y + '" width="' + G.mobo.w + '" height="' + G.mobo.h + '" rx="6" fill="none" stroke="#2d3646" stroke-dasharray="6 4"/><text x="290" y="230" fill="#3d4a61" font-size="13">拖入主板</text>';
+  }
+  /* CPU + 散热器 */
+  if (build.cpu) {
+    const c = P.byId(build.cpu), k = G.cpuSock;
+    s += '<g class="partBox" data-cat="cpu"><rect x="' + k.x + '" y="' + k.y + '" width="' + k.w + '" height="' + k.h + '" rx="4" fill="#101c2c" stroke="#3fb6ff" stroke-width="1.5"/>';
+    if (!build.cooler) s += '<text x="' + (k.x + 8) + '" y="' + (k.y + 40) + '" fill="#3fb6ff" font-size="9">' + c.name + '</text>';
+    s += '</g>';
+    if (build.cooler) {
+      const co = P.byId(build.cooler), p = G.coolerPos;
+      if (co.type === 'aio') {
+        s += '<g class="partBox" data-cat="cooler"><rect x="' + p.x + '" y="' + p.y + '" width="120" height="120" rx="8" fill="#182233" stroke="#7fd1ff" opacity=".95"/>';
+        s += '<circle cx="' + (p.x + 60) + '" cy="' + (p.y + 60) + '" r="34" fill="#0d1520" stroke="#7fd1ff"/>';
+        s += fanSVG(p.x + 60, p.y + 60, 26, running ? 'spinning' : '', '#7fd1ff');
+        s += '<path d="M' + (p.x + 100) + ',' + (p.y + 20) + ' C 420,40 480,60 540,50 M' + (p.x + 100) + ',' + (p.y + 30) + ' C 420,55 480,75 540,66" stroke="#2c3a52" stroke-width="7" fill="none" class="cable' + (running ? ' done' : '') + '" data-cab="aio"/>';
+        s += '<text x="' + (p.x + 14) + '" y="' + (p.y + 114) + '" fill="#7fd1ff" font-size="9">360水冷</text></g>';
+      } else {
+        s += '<g class="partBox" data-cat="cooler"><rect x="' + p.x + '" y="' + p.y + '" width="120" height="120" rx="4" fill="#141d2b" stroke="#7fd1ff"/>';
+        for (let i = 0; i < 9; i++) s += '<rect x="' + (p.x + 8 + i * 12) + '" y="' + (p.y + 6) + '" width="4" height="108" fill="#22304a"/>';
+        s += fanSVG(p.x + 60, p.y + 60, 30, running ? 'spinning' : '', '#7fd1ff');
+        s += '<text x="' + (p.x + 14) + '" y="' + (p.y + 116) + '" fill="#7fd1ff" font-size="9">' + co.name + '</text></g>';
+      }
+    }
+  }
+  /* 显卡（按分配槽位渲染，厚度=块高） */
+  a.gpuAssign.forEach((g, i) => {
+    const slot = G.pcieSlots[g.slotPos] || G.pcieSlots[4];
+    const hgt = 20 + g.thick * 14;
+    const col = g.slot.frac >= 0.9 ? '#3fd68f' : g.slot.frac >= 0.5 ? '#ffb454' : '#ff5d6c';
+    s += '<g class="partBox" data-cat="gpu" data-idx="' + i + '">';
+    s += '<rect x="' + slot.x + '" y="' + (slot.y - 4) + '" width="' + (slot.w + 40) + '" height="' + hgt + '" rx="4" fill="#1a1220" stroke="' + col + '" stroke-width="1.6"/>';
+    s += fanSVG(slot.x + 40, slot.y + hgt / 2 - 4, Math.min(16, hgt / 2 - 3), running ? 'spinning fast' : '', '#ff4d6d');
+    s += fanSVG(slot.x + 100, slot.y + hgt / 2 - 4, Math.min(16, hgt / 2 - 3), running ? 'spinning fast' : '', '#ff4d6d');
+    s += '<text x="' + (slot.x + 140) + '" y="' + (slot.y + 14) + '" fill="#ff8fa5" font-size="10">' + g.name + ' · ' + g.vram + 'G</text>';
+    s += '<text x="' + (slot.x + 140) + '" y="' + (slot.y + 27) + '" fill="' + col + '" font-size="9">x' + g.slot.lanes + ' ' + g.slot.gbps + 'GB/s frac' + g.slot.frac + ' · ' + g.tdp + 'W</text>';
+    /* 供电线 */
+    s += '<path d="M150,470 C 160,' + (slot.y + 60) + ' 170,' + (slot.y + 40) + ' ' + (slot.x + 10) + ',' + (slot.y + 10) + '" stroke="#ffd166" stroke-width="4" fill="none" opacity=".85" class="cable' + (running ? ' done' : '') + '" data-cab="gpu' + i + '"/>';
+    s += '</g>';
+  });
+  /* 电源 */
+  if (build.psu) {
+    const ps = P.byId(build.psu), b = G.psuBay;
+    s += '<g class="partBox" data-cat="psu"><rect x="' + b.x + '" y="' + (b.y + 14) + '" width="200" height="66" rx="6" fill="#1c1a12" stroke="#ffd166"/>';
+    s += fanSVG(b.x + 40, b.y + 47, 24, running ? 'spinning' : '', '#ffd166');
+    s += '<text x="' + (b.x + 76) + '" y="' + (b.y + 42) + '" fill="#ffd166" font-size="10">' + ps.name + '</text>';
+    s += '<text x="' + (b.x + 76) + '" y="' + (b.y + 58) + '" fill="#8b98ab" font-size="9">24pin 主供电</text></g>';
+    s += '<path d="M350,' + (b.y + 24) + ' C 380,380 400,300 520,80" stroke="#ffd166" stroke-width="5" fill="none" opacity=".8" class="cable' + (running ? ' done' : '') + '" data-cab="atx"/>';
+    s += '<path d="M350,' + (b.y + 34) + ' C 340,300 320,240 ' + (G.cpuSock.x + 100) + ',' + (G.cpuSock.y + 10) + '" stroke="#3fb6ff" stroke-width="4" fill="none" opacity=".8" class="cable' + (running ? ' done' : '') + '" data-cab="eps"/>';
+  }
+  /* 机箱风扇 + 前置面板 */
+  if (build.case) {
+    const cs = P.byId(build.case);
+    G.frontFans.slice(0, cs.fans >= 3 ? 3 : cs.fans).forEach((f, i) => { s += fanSVG(f.x + 22, f.y + 60, 34, running ? 'spinning' : '', '#3fb6ff'); });
+    if (cs.fans >= 7) { s += fanSVG(G.rearFan.x + 20, G.rearFan.y + 30, 26, running ? 'spinning' : '', '#3fb6ff'); s += fanSVG(300, 505, 26, running ? 'spinning' : '', '#3fb6ff'); s += fanSVG(380, 505, 26, running ? 'spinning' : '', '#3fb6ff'); s += fanSVG(460, 505, 26, running ? 'spinning' : '', '#3fb6ff'); }
+    s += '<rect x="46" y="60" width="14" height="440" rx="6" fill="#10161f" stroke="#2c3749"/>';
+    /* 电源按钮 LED */
+    s += '<circle cx="53" cy="72" r="5" fill="' + (running ? '#3fd68f' : '#2c3749') + '" class="led ' + (running ? 'on glow' : '') + '" style="color:#3fd68f"/>';
+  }
+  /* 核显输出示意 */
+  if (a.igpuChosen && build.cpu) {
+    s += '<g class="led ' + (running ? 'on' : '') + '"><rect x="548" y="150" width="70" height="46" rx="4" fill="#0d1520" stroke="#3fb6ff"/><text x="556" y="168" fill="#3fb6ff" font-size="9">核显输出</text><text x="556" y="182" fill="#8b98ab" font-size="8">' + P.byId(build.cpu).igpu + ' → 显示器</text></g>';
+  }
+  svg.innerHTML = s;
+  /* 机箱内点击退回。注意：内存条/SSD 的 partBox 嵌在主板 partBox 内，
+   * 必须 stopPropagation，否则点内存会连带冒泡触发主板的移除确认（用户反馈 bug） */
+  const CATNAME = { cpu: 'CPU', mobo: '主板', ram: '内存条', gpu: '显卡', ssd: 'M.2 固态硬盘', psu: '电源', cooler: 'CPU 散热器', case: '机箱' };
+  svg.querySelectorAll('.partBox').forEach(el => {
+    el.addEventListener('click', ev => {
+      ev.stopPropagation();
+      const nm = (el.querySelector('text') ? el.querySelector('text').textContent : '') || CATNAME[el.dataset.cat];
+      if (!confirm('从机箱移除 ' + nm + '？')) return;
+      removePart(el.dataset.cat, el.dataset.idx != null ? +el.dataset.idx : undefined);
+    });
+    el.addEventListener('dragstart', ev => {
+      ev.stopPropagation(); // 防止冒泡到主板导致主板被一并拆除
+      ev.dataTransfer.setData('text/plain', 'REMOVE:' + el.dataset.cat + ':' + (el.dataset.idx || ''));
+    });
+    el.setAttribute('draggable', 'true');
+  });
+}
+
+/* ---- 拖放目标：机箱 ---- */
+const wrap = document.getElementById('caseWrap');
+wrap.addEventListener('dragover', e => { e.preventDefault(); wrap.classList.add('dragover'); });
+wrap.addEventListener('dragleave', () => wrap.classList.remove('dragover'));
+wrap.addEventListener('drop', e => {
+  e.preventDefault(); wrap.classList.remove('dragover');
+  const id = e.dataTransfer.getData('text/plain');
+  if (id.startsWith('REMOVE:')) {
+    const [, cat, idx] = id.split(':');
+    removePart(cat, idx ? +idx : undefined); return;
+  }
+  const p = P.byId(id); if (!p) return;
+  install(p.id, p.cat);
+});
+
+/* ---- 3D 视图 ---- */
+let view3d = false, inited3d = false;
+function ensure3D() {
+  if (inited3d || !window.STRATA_3D) return;
+  window.STRATA_3D.init(document.getElementById('case3d'));
+  window.STRATA_3D.onRemove((cat, idx) => removePart(cat, idx));
+  inited3d = true;
+}
+function applyView() {
+  if (view3d && !window.STRATA_3D) view3d = false; // 3D 模块未加载（如 file:// 直开）→ 回退 2D
+  document.getElementById('caseSVG').style.display = view3d ? 'none' : 'block';
+  document.getElementById('case3d').style.display = view3d ? 'block' : 'none';
+  document.getElementById('btnDoor').style.display = view3d ? '' : 'none';
+  document.getElementById('btnReset').style.display = view3d ? '' : 'none';
+  document.getElementById('btnView').textContent = view3d ? '⇄ 切回 2D' : '⇄ 切到 3D';
+  if (view3d) {
+    ensure3D();
+    if (inited3d) {
+      const a = P.analyze(build, settings());
+      window.STRATA_3D.sync(build, a);
+      window.STRATA_3D.setPhase(running ? 'run' : 'idle');
+    }
+  }
+}
+function toggleView() {
+  if (!window.STRATA_3D) { alert('3D 模块未加载（需 importmap 环境或单文件版）'); return; }
+  view3d = !view3d; applyView();
+}
+document.getElementById('btnView').addEventListener('click', toggleView);
+document.getElementById('btnDoor').addEventListener('click', () => window.STRATA_3D && window.STRATA_3D.toggleDoor());
+document.getElementById('btnReset').addEventListener('click', () => window.STRATA_3D && window.STRATA_3D.resetView());
+
+/* ---- 主刷新 ---- */
+function onChange() {
+  document.getElementById('vCtx').textContent = (+document.getElementById('sCtx').value) + 'K';
+  document.getElementById('vConc').textContent = document.getElementById('sConc').value + ' 路';
+  const st = settings();
+  const a = P.analyze(build, st);
+  renderShelves();
+  renderCase(a);
+  if (view3d && inited3d) window.STRATA_3D.sync(build, a);
+  document.getElementById('priceTag').textContent = '整机参考造价 ¥' + totalPrice().toLocaleString() + '（闲鱼 2026-10-17 成交行情：内存/SSD 已按涨价潮校准）';
+  const btn = document.getElementById('bootBtn');
+  if (!running) {
+    btn.disabled = !a.canPost;
+    btn.classList.toggle('ready', a.canPost);
+    btn.textContent = a.canPost ? '启动' : '未就绪';
+  }
+  if (window.updateStatus) updateStatus(a, st);
+}
+window.isView3d = () => view3d;
+document.querySelectorAll('#strataBar select,#strataBar input').forEach(el => el.addEventListener('input', onChange));
+
+/* 初始化权重下拉 */
+P.models.forEach(m => {
+  const o = document.createElement('option'); o.value = m.id; o.textContent = m.name;
+  document.getElementById('sModel').appendChild(o);
+});
+document.getElementById('sModel').value = 'ud_q4';
+
+window.addEventListener('DOMContentLoaded', () => {
+  /* 预载"现机"配置，让页面一打开就有东西看 */
+  build.cpu = 'i7-12700KF'; build.mobo = 'z790-gaming-plus';
+  build.ram = ['d5-16-5600', 'd5-32-5200', 'd5-16-5600', 'd5-32-5200'];
+  build.gpu = ['rtx-3080-20g', 'rtx-4070s'];
+  build.ssd = ['ti600-1t']; build.psu = 'psu-1250t'; build.cooler = 'aio360'; build.case = 'mft3f';
+  onChange();
+  /* URL 参数：?3d 直接进 3D 视图；?3d&boot 再自动开机（演示/截图用） */
+  const q = location.search;
+  if (/[?&]3d/.test(q)) {
+    view3d = true; applyView();
+    if (/[&?]boot/.test(q)) setTimeout(() => { if (!running) boot(); }, 900);
+  }
+});
+
+</script>
+<script>
+/* ============ Strata 装机模拟器 · 状态/动画/仪表盘 ============ */
+'use strict';
+
+/* ---- 状态消息 + 三联读数（CPU核显内存显存） ---- */
+function updateStatus(a, st) {
+  const box = document.getElementById('status');
+  let h = '';
+  a.errors.forEach(e => h += '<div class="msg e">✗ ' + e + '</div>');
+  a.warns.slice(0, 6).forEach(w => h += '<div class="msg w">⚠ ' + w + '</div>');
+  if (a.canPost) h += '<div class="msg i">✓ 配置可点亮（POST 通过）——按启动按钮开始仿真</div>';
+  box.innerHTML = h;
+
+  /* 三联读数 */
+  const ro = document.getElementById('readouts');
+  let c1 = '', c2 = '', c3 = '';
+  if (a.cpu) {
+    const c = a.cpu;
+    c1 = '<h4>CPU · ' + c.name + '</h4><div class="big">' + c.p + 'P + ' + c.e + 'E = ' + c.thr + ' 线程</div>' +
+      '<div style="font-size:11px;color:var(--dim)">' + ({ '512': 'AVX-512 ✓', vnni: 'AVX-VNNI ✓', avx2: '仅 AVX2' })[c.simd] +
+      ' · 核显 ' + c.igpu + ' · PCIe Gen' + c.pcie.gen + ' ×' + c.pcie.lanes + ' 直连</div>' +
+      '<div class="bar"><i style="width:' + Math.round(c.p / 16 * 100) + '%;background:var(--cpu)"></i></div>' +
+      '<div style="font-size:10px;color:var(--dim)">P核 ' + c.pt + 'T（' + c.p + '核）｜E核 ' + c.et + 'T（' + c.e + '核）</div>';
+  } else c1 = '<h4>CPU</h4><div class="big" style="color:var(--dim)">未装配</div>';
+  if (a.ram && !a.ram.error) {
+    const r = a.ram;
+    const slotTxt = r.slots.map((d, i) => d ? ('槽' + (i + 1) + ':' + d.size + 'G') : ('槽' + (i + 1) + ':空')).join(' ');
+    c2 = '<h4>内存 · ' + r.total + 'G ' + (r.channels === 2 ? '双通道' : r.channels === 1.5 ? '弹性1.5通道' : '单通道') + '</h4>' +
+      '<div class="big">DDR' + r.slots.filter(Boolean)[0].gen + ' @ ' + r.mt + ' MT/s · ' + Math.round(r.bw) + 'GB/s</div>' +
+      '<div style="font-size:11px;color:var(--dim)">' + slotTxt + ' · ' + (r.symmetric ? '对称插法 ✓' : '非对称混插 ⚠') + '</div>' +
+      (r.derates.length ? '<div style="font-size:10.5px;color:var(--warn)">' + r.derates.join('；') + '</div>' : '');
+  } else c2 = '<h4>内存</h4><div class="big" style="color:var(--dim)">' + (a.ram && a.ram.error ? a.ram.error : '未装配') + '</div>';
+  if (a.gpuAssign.length) {
+    const tot = a.gpuAssign.reduce((s, g) => s + g.vram, 0);
+    c3 = '<h4>显存 · ' + tot + 'G ' + (a.gpuAssign.length > 1 ? '双卡 layer-split' : '单卡') + (a.igpuChosen ? ' · 核显输出' : ' · 独卡显示') + '</h4>';
+    a.gpuAssign.forEach(g => {
+      const col = g.slot.frac >= 0.9 ? 'var(--ok)' : g.slot.frac >= 0.5 ? 'var(--warn)' : 'var(--err)';
+      c3 += '<div class="big" style="font-size:12px;color:' + col + '">' + g.name + ' ' + g.vram + 'G · 槽' + g.slot.pos + ' x' + g.slot.lanes + 'Gen' + g.slot.gen + ' ' + g.slot.gbps + 'GB/s</div>';
+    });
+    const asym = new Set(a.gpuAssign.map(g => g.vram)).size > 1;
+    if (asym) c3 += '<div style="font-size:10.5px;color:var(--warn)">非对称显存：K值自动切分（本机实测 K=35/48 层）</div>';
+  } else c3 = '<h4>显存</h4><div class="big" style="color:var(--dim)">' + (a.igpuChosen || (a.cpu && a.cpu.igpu !== 'none') ? '核显（decode 个位数）' : '未装配') + '</div>';
+  ro.innerHTML = '<div class="ro">' + c1 + '</div><div class="ro">' + c2 + '</div><div class="ro">' + c3 + '</div>';
+  if (running) renderDash();
+}
+
+/* ---- 仪表盘 ---- */
+function gauge(t, v, u, cls) { return '<div class="gauge ' + (cls || '') + '"><div class="t">' + t + '</div><div class="v">' + v + '</div><div class="u">' + u + '</div></div>'; }
+function tempCls(t) { return t >= 88 ? 'hot' : t >= 75 ? 'warm' : ''; }
+function renderDash() {
+  const st = settings();
+  const r = S.simulate(build, st);
+  const box = document.getElementById('dash');
+  if (!r.ok || !r.m) { box.innerHTML = ''; return; }
+  const m = r.m;
+  let h = '';
+  h += gauge('解码吞吐', m.decode, 't/s 单流' + (st.conc > 1 ? '｜总 ' + m.decodeTotal : ''), m.decode >= 55 ? '' : m.decode >= 25 ? 'warm' : 'hot');
+  h += gauge('预填充速度', m.prefill, 't/s（输入吞吐）');
+  h += gauge('首字等待 TTFT', m.ttft >= 100 ? Math.round(m.ttft / 60) + '分' + Math.round(m.ttft % 60) + '秒' : m.ttft + 's', m.ctxK + 'K 上下文');
+  h += gauge('专家命中率', Math.round(m.hit * 100) + '%', '显存' + Math.round(m.fV * 100) + '%+内存' + Math.round(m.fR * 100) + '%');
+  /* 驻留分布条 */
+  h += '<div class="gauge" style="grid-column:span 2;text-align:left"><div class="t">专家驻留（池 ' + m.pool + 'G：显存 ' + m.vramExperts + 'G ｜ 内存 ' + m.ramExperts + 'G ｜ 盘 ' + m.diskExperts + 'G）</div>' +
+    '<div class="bar" style="height:14px;display:flex"><i style="width:' + (m.fV * 100) + '%;background:var(--gpu)"></i><i style="width:' + (m.fR * 100) + '%;background:var(--ram)"></i><i style="width:' + (m.fD * 100) + '%;background:var(--warn)"></i></div>' +
+    '<div style="font-size:10px;color:var(--dim);margin-top:3px">红=显存常驻(最快) 紫=内存经PCIe流式 黄=盘溢出 ｜ KV ' + m.kvG + 'G' + (m.chunkLimited ? ' ｜ ⚠ chunk≤' + m.chunkCap + '（issue#448）' : '') + (m.batchOK ? ' ｜ batch 路径 ✓' : '') + '</div></div>';
+  /* 负载/温度/功率 */
+  const cpuPct = Math.round(m.cpuLoad * 100), vramMax = Math.max(...m.vramUse.map((v, i) => v / m.cards[i].vram * 100));
+  const ramPct = m.ramUsed / m.ramTotal * 100;
+  h += '<div class="gauge" style="text-align:left"><div class="t">负载</div>' +
+    '<div style="font-size:10.5px">CPU ' + cpuPct + '%（' + m.coresUsed + '/' + r.hw.cpu.thr + 'T）<div class="bar"><i style="width:' + cpuPct + '%;background:' + (cpuPct > 85 ? 'var(--err)' : 'var(--cpu)') + '"></i></div></div>' +
+    '<div style="font-size:10.5px;margin-top:3px">GPU ' + Math.round(m.gpuLoad * 100) + '%（推理满载）<div class="bar"><i style="width:' + Math.round(m.gpuLoad * 100) + '%;background:var(--ok)"></i></div></div>' +
+    '<div style="font-size:10.5px;margin-top:3px">显存 ' + Math.round(vramMax) + '%<div class="bar"><i style="width:' + vramMax + '%;background:var(--gpu)"></i></div></div>' +
+    '<div style="font-size:10.5px;margin-top:3px">内存 ' + Math.round(ramPct) + '%（余' + m.ramFree + 'G）<div class="bar"><i style="width:' + ramPct + '%;background:' + (ramPct > 90 ? 'var(--err)' : 'var(--ram)') + '"></i></div></div></div>';
+  h += '<div class="gauge" style="text-align:left"><div class="t">温度（环境26°C）</div>' +
+    m.cards.map((c, i) => '<div style="font-size:10.5px" class="' + tempCls(m.temps.gpu[i]) + '">' + c.name.split(' ')[0] + ' ' + m.temps.gpu[i] + '°C</div>').join('') +
+    '<div style="font-size:10.5px" class="' + tempCls(m.temps.cpu) + '">CPU ' + m.temps.cpu + '°C ｜ 内存 ' + m.temps.ram + '°C</div>' +
+    '<div style="font-size:10.5px">SSD ' + m.temps.ssd + '°C ｜ 箱内 ' + m.temps.sys + '°C</div></div>';
+  h += gauge('整机功率', m.power, 'W（电源 ' + (r.hw.psu ? r.hw.psu.w : '-') + 'W）', r.hw.psu && m.power > r.hw.psu.w * 0.85 ? 'hot' : '');
+  h += gauge('本次回答', m.outTokens, 'tokens（思考' + st.think + '）≈ ' + Math.round(m.outTokens / m.decode) + 's');
+  box.innerHTML = h;
+  /* 遥测推送 3D（风扇转速按温度） */
+  if (window.STRATA_3D && window.isView3d && window.isView3d()) {
+    window.STRATA_3D.setTelemetry(Object.assign({}, m, { mode: window.__inferMode || 'decode' }));
+  }
+}
+
+/* ---- 开机流程 ---- */
+const log = (t, cls) => {
+  const el = document.getElementById('bootLog');
+  el.innerHTML += '<div class="' + (cls || '') + '">[' + new Date().toLocaleTimeString() + '] ' + t + '</div>';
+  el.scrollTop = el.scrollHeight;
+};
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+async function boot() {
+  const st = settings();
+  const a = P.analyze(build, st);
+  if (!a.canPost) return;
+  running = true;
+  const btn = document.getElementById('bootBtn');
+  btn.classList.remove('ready'); btn.classList.add('running'); btn.textContent = '运行中';
+  document.getElementById('bootLog').innerHTML = '';
+  const v3 = window.STRATA_3D && window.isView3d && window.isView3d();
+  if (v3) { window.STRATA_3D.sync(build, a); window.STRATA_3D.setPhase('boot'); }
+  log('POST：自检开始…');
+  await sleep(500);
+  log('内存训练：' + a.ram.total + 'G @ ' + a.ram.mt + 'MT/s ' + (a.ram.derates.length ? '（' + a.ram.derates.join('；') + '）' : '✓'), a.ram.derates.length ? 'l-w' : 'l-ok');
+  /* 插线动画 */
+  log('连接供电线：24pin 主板 / EPS CPU / PCIe 显卡…');
+  if (v3) window.STRATA_3D.setPhase('cables');
+  document.querySelectorAll('#caseSVG .cable').forEach((c, i) => setTimeout(() => c.classList.add('plug'), i * 350));
+  await sleep(v3 ? 2600 : 350 * (document.querySelectorAll('#caseSVG .cable').length + 1));
+  log('安装散热器：' + P.byId(build.cooler).name + ' ✓', 'l-ok');
+  await sleep(400);
+  log('风扇通电：机箱 ' + P.byId(build.case).fans + ' 把 + CPU + 显卡风冷', 'l-ok');
+  renderCase(Object.assign(P.analyze(build, st), {})); // 重绘带转扇
+  /* 引擎启动 */
+  log('strata.exe 启动：--pack ' + (st.model === 'ud_q4' ? 'G:\\llm\\dl\\...\\unsloth-UD-Q4_K_XL' : 'G:\\llm\\Strata-data\\packs\\' + st.model));
+  await sleep(700);
+  const r = S.simulate(build, st);
+  if (!r.ok || !r.m) { log('引擎退出：无可用显示输出', 'l-err'); running = false; btn.textContent = '未就绪'; return; }
+  const m = r.m;
+  log('PCIe 探测：' + m.cards.map(c => c.name.split(' ')[0] + ' ' + c.gbps + 'GB/s→frac ' + c.frac).join('，'), m.cards.some(c => c.frac < 0.5) ? 'l-w' : 'l-ok');
+  log('layer-split auto：' + (m.dual ? '从 46 种排布选 K 值，双卡流水线' : '单卡') + '；专家装载 显存' + m.vramExperts + 'G + 内存arena ' + m.ramExperts + 'G', m.diskExperts > 0.5 ? 'l-w' : 'l-ok');
+  if (m.chunkLimited) log('WARNING #448：副卡槽位不足 → prompt chunk ≤ ' + m.chunkCap + '（helper-cache 可缓解）', 'l-w');
+  log('session is up ✓ ctx=' + (st.ctx) + ' 并发=' + st.conc, 'l-ok');
+  if (v3) window.STRATA_3D.setPhase('run');
+  /* prefill→decode 灯光模式：前 6s 红脉冲（prefill），后转绿呼吸（decode） */
+  window.__inferMode = 'prefill';
+  setTimeout(() => { if (running) window.__inferMode = 'decode'; }, 6000);
+  renderDash();
+  let dashTimer = window.__dashTimer;
+  if (dashTimer) clearInterval(dashTimer);
+  window.__dashTimer = setInterval(() => { if (running) renderDash(); }, 2500);
+  log('仿真运行中——改上方 Strata 指标或增删配件，仪表盘实时联动');
+}
+document.getElementById('bootBtn').addEventListener('click', () => { if (!running) boot(); });
+
+</script>
+<script type="importmap">
+{
+  "imports": {
+    "three": "../vendor/three.module.js",
+    "three/addons/": "../vendor/"
+  }
+}
+</script>
+<script type="module" src="3d.js"></script>
+</body>
+</html>

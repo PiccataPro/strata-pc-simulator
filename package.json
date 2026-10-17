@@ -1,0 +1,28 @@
+{
+  "name": "strata-pc-simulator",
+  "version": "1.0.0",
+  "description": "A realistic PC-building simulator for MoE local inference (Strata engine). Drag parts into a case, boot it up, and watch decode/prefill/TTFT/expert-residency/thermals respond to your hardware and Strata settings.",
+  "main": "src/parts.js",
+  "scripts": {
+    "test": "node test.js",
+    "build": "node scripts/build.js",
+    "serve": "npx http-server src -p 8080 -c-1"
+  },
+  "keywords": [
+    "strata",
+    "moe",
+    "llm",
+    "local-llm",
+    "pc-builder",
+    "hardware-simulator",
+    "qwen",
+    "expert-cache",
+    "pcie",
+    "visualization"
+  ],
+  "author": "Mingming",
+  "license": "MIT",
+  "engines": {
+    "node": ">=16"
+  }
+}

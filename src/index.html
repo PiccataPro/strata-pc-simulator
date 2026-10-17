@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Strata 装机模拟器 · 写实版</title>
+<style>
+:root{
+  --bg:#0d1117; --panel:#161b22; --panel2:#1c2330; --line:#2d3646; --txt:#dbe4f0; --dim:#8b98ab;
+  --acc:#3fb6ff; --ok:#3fd68f; --warn:#ffb454; --err:#ff5d6c; --gpu:#ff4d6d; --cpu:#3fb6ff; --ram:#b98cff; --ssd:#54d6c8; --psu:#ffd166; --cool:#7fd1ff; --mobo:#9aa7b8; --case2:#232b3a;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--txt);font:13px/1.5 "Segoe UI","Microsoft YaHei",sans-serif;min-width:1280px}
+h1{font-size:16px;letter-spacing:1px}
+header{display:flex;align-items:center;gap:14px;padding:10px 16px;background:linear-gradient(90deg,#10151f,#182234);border-bottom:1px solid var(--line)}
+header .tag{font-size:11px;color:var(--dim)}
+/* ---- 顶部 Strata 设置条 ---- */
+#strataBar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+#strataBar label{font-size:12px;color:var(--dim);display:flex;flex-direction:column;gap:2px}
+#strataBar select,#strataBar input[type=range]{background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:3px 6px;font-size:12px}
+#strataBar .val{color:var(--acc);font-weight:600;font-size:12px}
+#strataBar .chk{flex-direction:row;align-items:center;gap:5px;color:var(--txt);font-size:12px;padding-top:14px}
+/* ---- 三栏布局 ---- */
+#main{display:grid;grid-template-columns:270px 1fr 270px;gap:10px;padding:10px 16px}
+.shelf{display:flex;flex-direction:column;gap:8px;max-height:calc(100vh - 210px);overflow-y:auto;padding-right:4px}
+.shelf h3{font-size:12px;color:var(--dim);border-left:3px solid var(--acc);padding-left:6px;margin-top:4px}
+.part{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:7px 9px;cursor:grab;user-select:none;transition:.15s}
+.part:hover{border-color:var(--acc);transform:translateY(-1px)}
+.part .nm{font-size:12px;font-weight:600}
+.part .sp{font-size:10.5px;color:var(--dim);margin-top:2px}
+.part .pr{font-size:11px;color:var(--warn);float:right}
+.part.inuse{opacity:.35;pointer-events:none}
+.part.cat-cpu{border-left:3px solid var(--cpu)} .part.cat-mobo{border-left:3px solid var(--mobo)}
+.part.cat-ram{border-left:3px solid var(--ram)} .part.cat-gpu{border-left:3px solid var(--gpu)}
+.part.cat-ssd{border-left:3px solid var(--ssd)} .part.cat-psu{border-left:3px solid var(--psu)}
+.part.cat-cooler{border-left:3px solid var(--cool)} .part.cat-case{border-left:3px solid #6b7a90}
+/* ---- 中间机箱 ---- */
+#center{display:flex;flex-direction:column;gap:8px}
+#caseWrap{position:relative;background:linear-gradient(160deg,#141a26,#0c1017);border:1px solid var(--line);border-radius:14px;padding:12px;min-height:560px}
+#caseSVG{width:100%;height:auto;display:block}
+.slot{stroke:#39465c;stroke-width:1.5;fill:#10161f;transition:.2s}
+.slot.ok{stroke:var(--ok);fill:#12251c}
+.slot.bad{stroke:var(--err);fill:#2a1216}
+.slot.hot{stroke:var(--acc);stroke-dasharray:5 3;animation:pulse 1s infinite}
+@keyframes pulse{50%{stroke-opacity:.3}}
+.slotLabel{fill:#5c6b82;font-size:11px;font-family:inherit}
+.partBox{cursor:grab}
+.partBox text{font-family:inherit}
+.fan{transform-origin:center;transform-box:fill-box}
+.spinning{animation:spin 1.2s linear infinite}
+.spinning.fast{animation-duration:.45s}
+@keyframes spin{to{transform:rotate(360deg)}}
+.cable{stroke-dasharray:300;stroke-dashoffset:300;opacity:0}
+.cable.done{stroke-dashoffset:0;opacity:1}
+.cable.plug{animation:plug 1.1s ease forwards}
+@keyframes plug{to{stroke-dashoffset:0;opacity:1}}
+.led{opacity:0}.led.on{opacity:1;animation:blink 2.4s infinite}
+@keyframes blink{50%{opacity:.55}}
+.glow{filter:drop-shadow(0 0 6px currentColor)}
+/* ---- 状态/警告 ---- */
+#status{display:flex;gap:8px;flex-wrap:wrap}
+.msg{font-size:11.5px;padding:4px 9px;border-radius:6px;border:1px solid}
+.msg.e{border-color:var(--err);color:var(--err);background:#2a1216}
+.msg.w{border-color:var(--warn);color:var(--warn);background:#2a2213}
+.msg.i{border-color:var(--acc);color:var(--acc);background:#12202b}
+/* ---- 读数面板 ---- */
+#readouts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.ro{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.ro h4{font-size:11px;color:var(--dim);margin-bottom:4px}
+.ro .big{font-size:14px;font-weight:600}
+.bar{height:7px;background:#0b0f16;border-radius:4px;overflow:hidden;margin-top:4px}
+.bar i{display:block;height:100%;border-radius:4px;transition:width .6s,background .6s}
+/* ---- 仪表盘 ---- */
+#dash{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.gauge{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px;text-align:center}
+.gauge .v{font-size:22px;font-weight:700;color:var(--acc)}
+.gauge .u{font-size:10px;color:var(--dim)}
+.gauge .t{font-size:11px;color:var(--dim);margin-bottom:2px}
+.gauge.hot .v{color:var(--err)}
+.gauge.warm .v{color:var(--warn)}
+/* ---- 底部按钮 ---- */
+footer{display:flex;align-items:center;gap:16px;padding:12px 16px;background:var(--panel);border-top:1px solid var(--line);position:sticky;bottom:0}
+#bootBtn{width:92px;height:92px;border-radius:50%;border:3px solid #2c3a52;background:radial-gradient(circle at 35% 30%,#25324a,#131a28);color:#4d5f7e;font-size:13px;font-weight:700;cursor:pointer;transition:.25s;letter-spacing:2px}
+#bootBtn.ready{border-color:var(--ok);color:var(--ok);box-shadow:0 0 22px #3fd68f44}
+#bootBtn.running{border-color:var(--acc);color:var(--acc);box-shadow:0 0 30px #3fb6ff66;animation:pulse 1.6s infinite}
+#bootBtn:disabled{cursor:not-allowed}
+#bootLog{flex:1;font-size:12px;color:var(--dim);max-height:86px;overflow-y:auto;background:#0b0f16;border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-family:Consolas,monospace}
+#bootLog .l-ok{color:var(--ok)}#bootLog .l-err{color:var(--err)}#bootLog .l-w{color:var(--warn)}
+#hint{font-size:11px;color:var(--dim);max-width:260px}
+/* 拖出提示 */
+#caseWrap.dragover{outline:2px dashed var(--acc);outline-offset:-6px}
+/* ---- 3D 视图 ---- */
+#case3d{display:none;width:100%;height:560px;border-radius:10px;overflow:hidden;position:relative}
+#case3d canvas{display:block;width:100%;height:100%}
+#viewBar{position:absolute;top:8px;right:10px;display:flex;gap:6px;z-index:5}
+#viewBar button{background:#141c2acc;color:var(--dim);border:1px solid var(--line);border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;backdrop-filter:blur(4px)}
+#viewBar button:hover{color:var(--acc);border-color:var(--acc)}
+#hint3d{position:absolute;left:10px;bottom:8px;font-size:10.5px;color:#5c6b82;z-index:5;pointer-events:none}
+::-webkit-scrollbar{width:8px}::-webkit-scrollbar-thumb{background:#2c3749;border-radius:4px}
+</style>
+</head>
+<body>
+<header>
+  <h1>⬢ STRATA 装机模拟器</h1>
+  <span class="tag">Qwen3.8-Flash-Next 125B MoE · 专家缓存分层仿真 · 数据锚定 2026-10 实测（本机 + 官方 bench）</span>
+</header>
+
+<div id="strataBar">
+  <label>权重档位<select id="sModel"></select></label>
+  <label>上下文长度 <span class="val" id="vCtx"></span><input type="range" id="sCtx" min="8" max="256" step="8" value="256"></label>
+  <label>并发路数 <span class="val" id="vConc"></span><input type="range" id="sConc" min="1" max="8" value="1"></label>
+  <label>思考强度<select id="sThink">
+    <option value="light">light（少思考快出）</option>
+    <option value="balanced" selected>balanced（均衡）</option>
+    <option value="deep">deep（深度思考）</option>
+  </select></label>
+  <label class="chk"><input type="checkbox" id="sIgpu">核显输出（独卡纯计算化）</label>
+  <label class="chk"><input type="checkbox" id="sHelper">helper-cache 模式</label>
+  <span style="flex:1"></span>
+  <span class="tag" id="priceTag"></span>
+</div>
+
+<div id="main">
+  <div class="shelf" id="shelfL"></div>
+  <div id="center">
+    <div id="caseWrap">
+      <svg id="caseSVG" viewBox="0 0 760 560"></svg>
+      <div id="case3d">
+        <div id="viewBar">
+          <button id="btnDoor" style="display:none">🚪 开/关侧盖</button>
+          <button id="btnReset" style="display:none">🎯 复位视角</button>
+          <button id="btnView">⇄ 切到 3D</button>
+        </div>
+        <div id="hint3d">拖拽旋转视角・滚轮缩放・双击开合玻璃侧盖・点击配件拆除（或拖出机箱外）</div>
+      </div>
+    </div>
+    <div id="status"></div>
+    <div id="readouts"></div>
+    <div id="dash"></div>
+  </div>
+  <div class="shelf" id="shelfR"></div>
+</div>
+
+<footer>
+  <button id="bootBtn" disabled>启动</button>
+  <div id="bootLog">把配件拖进机箱 → 基本件齐全（CPU/主板/内存/散热/电源/SSD/机箱 + 显示输出）才能点亮。<br>配件从机箱拖出即拆除。机箱内点击配件也可退回货架。</div>
+  <div id="hint">💡 拖拽装配。注意：主板第二槽的电气规格（CPU直连x8 vs 芯片组x4）决定 Strata 副卡 pcie_frac——4070S 的教训会在这里重演。</div>
+</footer>
+
+<script src="parts.js"></script>
+<script src="sim.js"></script>
+<script src="app.js"></script>
+<script src="app2.js"></script>
+<script type="importmap">
+{
+  "imports": {
+    "three": "../vendor/three.module.js",
+    "three/addons/": "../vendor/"
+  }
+}
+</script>
+<script type="module" src="3d.js"></script>
+</body>
+</html>
