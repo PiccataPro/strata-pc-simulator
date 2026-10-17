@@ -13,6 +13,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      # build.js 找不到 esbuild 会直接 exit 1（以前是崩在 spawnSync ENOENT），
+      # 干净检出必须先装依赖，否则构建步骤必红。
+      - name: Install deps
+        run: npm ci
       - name: Run 36-check verification suite
         run: node test.js
       - name: Build single-file bundle
