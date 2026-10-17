@@ -4,7 +4,7 @@
 
 A web-based, dependency-free simulator that answers the question every local-LLM builder eventually asks: **"which GPU / motherboard / RAM should I buy next, and what will it actually do to my tokens-per-second?"**
 
-**[🎮 Live Demo (GitHub Pages)](https://YOUR-USERNAME.github.io/strata-pc-simulator/)** · No install, just open and drag.
+**[🎮 Live Demo (GitHub Pages)](https://piccatapro.github.io/strata-pc-simulator/)** · No install, just open and drag.
 
 ---
 
