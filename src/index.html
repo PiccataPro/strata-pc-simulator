@@ -54,6 +54,30 @@ header .tag{font-size:11px;color:var(--dim)}
 .part.cat-cooler{border-left:3px solid var(--cool)} .part.cat-case{border-left:3px solid #6b7a90}
 /* ---- 中间机箱 ---- */
 #center{display:flex;flex-direction:column;gap:8px}
+/* 2D 视图顶部那条醒目的 3D 入口。红→橙渐变 + 呼吸光晕，是全页视觉重心 */
+#cta3dBig{position:relative;display:flex;align-items:center;gap:16px;width:100%;padding:17px 22px;
+  border-radius:14px;cursor:pointer;overflow:hidden;text-align:left;
+  border:1px solid #ff5f6d;background:linear-gradient(100deg,#8f1220 0%,#d81e2c 38%,#ff4b2b 72%,#ff8a3d 100%);
+  color:#fff;box-shadow:0 10px 30px #d81e2c4d,0 0 0 1px #ffffff1f inset;
+  animation:ctaPulse 2.6s ease-in-out infinite}
+@keyframes ctaPulse{
+  0%,100%{box-shadow:0 10px 30px #d81e2c40,0 0 0 1px #ffffff1f inset}
+  50%{box-shadow:0 14px 44px #ff3b30a6,0 0 26px #ff5f6d66,0 0 0 1px #ffffff33 inset}
+}
+#cta3dBig:hover{filter:brightness(1.08)}
+#cta3dBig:active{transform:translateY(1px)}
+#cta3dBig .ic{font-size:38px;line-height:1;filter:drop-shadow(0 0 10px #fff6)}
+#cta3dBig .tx{display:flex;flex-direction:column;gap:4px;flex:1;min-width:0}
+#cta3dBig .tx b{font-size:23px;letter-spacing:1.6px;text-shadow:0 2px 10px #0006}
+#cta3dBig .tx i{font-style:normal;font-size:12px;letter-spacing:.4px;color:#ffe0d8}
+#cta3dBig .go{flex:0 0 auto;font-size:14px;font-weight:700;padding:10px 18px;border-radius:10px;
+  background:#ffffff1f;border:1px solid #ffffff5c;backdrop-filter:blur(3px)}
+#cta3dBig::after{content:"";position:absolute;inset:-60% -30%;background:linear-gradient(115deg,transparent 44%,#ffffff38 50%,transparent 56%);transform:translateX(-70%);animation:ctaSweep 3.6s ease-in-out infinite}
+@keyframes ctaSweep{0%,72%{transform:translateX(-70%)}100%{transform:translateX(70%)}}
+#cta3dBig.gone{display:none}
+#cta3dBig.off{border-color:#3a4453;background:linear-gradient(100deg,#2b323c,#1a1f27);animation:none;
+  box-shadow:0 8px 20px #0006;cursor:not-allowed}
+#cta3dBig.off::after{display:none}
 #caseWrap{position:relative;background:linear-gradient(160deg,#141a26,#0c1017);border:1px solid var(--line);border-radius:14px;padding:12px;min-height:560px}
 #caseSVG{width:100%;height:auto;display:block}
 .slot{stroke:#39465c;stroke-width:1.5;fill:#10161f;transition:.2s}
@@ -189,6 +213,11 @@ footer{display:flex;align-items:center;gap:16px;padding:12px 16px;background:var
 <div id="main">
   <div class="shelf" id="shelfL"></div>
   <div id="center">
+    <button id="cta3dBig" type="button">
+      <span class="ic">⬢</span>
+      <span class="tx"><b>进入 3D 实景装机台</b><i>真机开箱 · 玻璃侧透 · 点哪拆哪 · 开机跑分</i></span>
+      <span class="go">开始装机 →</span>
+    </button>
     <div id="caseWrap">
       <div id="viewBar">
         <button id="btnDoor" style="display:none">🚪 开/关侧盖</button>

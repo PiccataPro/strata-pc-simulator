@@ -248,11 +248,14 @@ function renderCase(a) {
     const m = P.byId(build.mobo);
     s += '<g class="partBox" data-cat="mobo"><rect x="' + G.mobo.x + '" y="' + G.mobo.y + '" width="' + G.mobo.w + '" height="' + G.mobo.h + '" rx="6" fill="#14202e" stroke="#3fd68f" stroke-width="1.5"/>';
     s += '<text x="' + (G.mobo.x + 8) + '" y="' + (G.mobo.y + 16) + '" fill="#7fd1a0" font-size="11">' + m.name + '（' + m.socket + '）</text>';
-    /* PCIe 槽（电气着色） */
+    /* PCIe 槽（电气着色）。装了卡的槽不再画槽标签：
+     * 显卡块画在槽上面，标签尾巴会从块边缘露出来，和显卡型号叠成一团。 */
+    const gpuSlots = new Set((a.gpuAssign || []).map(g => g.slotPos));
     a.pcie.forEach(p => {
       const g = G.pcieSlots[p.pos]; if (!g) return;
       const col = p.frac >= 0.9 ? '#3fd68f' : p.frac >= 0.5 ? '#ffb454' : '#ff5d6c';
       s += '<rect x="' + g.x + '" y="' + g.y + '" width="' + g.w + '" height="' + g.h + '" rx="3" fill="#0a0f18" stroke="' + col + '" stroke-width="1.6"/>';
+      if (gpuSlots.has(p.pos)) return;
       s += '<text x="' + (g.x + g.w + 6) + '" y="' + (g.y + 15) + '" fill="' + col + '" font-size="10">槽' + p.pos + ' x' + p.lanes + ' Gen' + p.gen + ' · ' + p.gbps + 'GB/s · frac ' + p.frac + (p.src === 'chipset' ? ' 芯片组' : '') + '</text>';
     });
     /* 内存槽（稀疏槽位制：索引0=CPU侧最近槽；同字母=同通道，典型 A1A2B1B2） */
@@ -309,7 +312,9 @@ function renderCase(a) {
     s += fanSVG(slot.x + 40, slot.y + hgt / 2 - 4, Math.min(16, hgt / 2 - 3), running ? 'spinning fast' : '', '#ff4d6d');
     s += fanSVG(slot.x + 100, slot.y + hgt / 2 - 4, Math.min(16, hgt / 2 - 3), running ? 'spinning fast' : '', '#ff4d6d');
     s += '<text x="' + (slot.x + 140) + '" y="' + (slot.y + 14) + '" fill="#ff8fa5" font-size="10">' + g.name + ' · ' + g.vram + 'G</text>';
-    s += '<text x="' + (slot.x + 140) + '" y="' + (slot.y + 27) + '" fill="' + col + '" font-size="9">x' + g.slot.lanes + ' ' + g.slot.gbps + 'GB/s frac' + g.slot.frac + ' · ' + g.tdp + 'W</text>';
+    /* 第二行承接原来槽标签的信息（槽位标签在装卡后会被隐藏） */
+    const slotP = (a.pcie || []).find(p => p.pos === g.slotPos) || {};
+    s += '<text x="' + (slot.x + 140) + '" y="' + (slot.y + 27) + '" fill="' + col + '" font-size="9">x' + g.slot.lanes + ' Gen' + (slotP.gen || '?') + ' ' + g.slot.gbps + 'GB/s · frac ' + g.slot.frac + ' · ' + g.tdp + 'W' + (slotP.src === 'chipset' ? ' · 芯片组' : '') + '</text>';
     /* 供电线 */
     s += '<path d="M150,470 C 160,' + (slot.y + 60) + ' 170,' + (slot.y + 40) + ' ' + (slot.x + 10) + ',' + (slot.y + 10) + '" stroke="#ffd166" stroke-width="4" fill="none" opacity=".85" class="cable' + (running ? ' done' : '') + '" data-cab="gpu' + i + '"/>';
     s += '</g>';
@@ -419,6 +424,9 @@ function applyView() {
   document.getElementById('btnDoor').style.display = view3d ? '' : 'none';
   document.getElementById('btnReset').style.display = view3d ? '' : 'none';
   document.getElementById('btnView').textContent = view3d ? '⇄ 切回 2D' : '⇄ 切到 3D';
+  /* 顶部大按钮只属于 2D：进了 3D 它就没有意义了（还会白占 90px 高度） */
+  const big = document.getElementById('cta3dBig');
+  if (big) big.classList.toggle('gone', view3d);
   if (view3d) {
     ensure3D();
     if (inited3d) {
@@ -458,6 +466,7 @@ function show3dNotice() {
 function mark3dState() {
   const b = document.getElementById('btnView');
   const cta = document.getElementById('cta3d');
+  const big = document.getElementById('cta3dBig');
   const ok = !!window.STRATA_3D;
   if (b) {
     if (ok) {
@@ -470,7 +479,25 @@ function mark3dState() {
       b.title = why3dUnavailable();
     }
   }
-  /* 右栏那颗大按钮：3D 可用时跟随视图状态换文案，不可用时置灰并说明原因 */
+  /* 顶部那条大横幅：3D 不可用时换成警告样式并给出原因 */
+  if (big) {
+    big.classList.toggle('off', !ok);
+    const tb = big.querySelector('.tx b'), ti = big.querySelector('.tx i'), ic = big.querySelector('.ic'), go = big.querySelector('.go');
+    if (!ok) {
+      ic.textContent = '⚠';
+      tb.textContent = '3D 视图不可用';
+      ti.textContent = '点击查看原因（多半是服务根目录或直接双击了 src/index.html）';
+      go.textContent = '看原因';
+      big.title = why3dUnavailable();
+    } else {
+      ic.textContent = '⬢';
+      tb.textContent = '进入 3D 实景装机台';
+      ti.textContent = '真机开箱 · 玻璃侧透 · 点哪拆哪 · 开机跑分';
+      go.textContent = '开始装机 →';
+      big.title = '';
+    }
+  }
+  /* 右栏那颗竖向按钮：3D 可用时跟随视图状态换文案，不可用时置灰并说明原因 */
   if (cta) {
     cta.classList.toggle('off', !ok);
     cta.classList.toggle('on', ok && view3d);
@@ -498,9 +525,13 @@ function toggleView() {
   view3d = !view3d; applyView();
 }
 document.getElementById('btnView').addEventListener('click', toggleView);
-document.getElementById('cta3d').addEventListener('click', () => {
-  if (!window.STRATA_3D) { show3dNotice(); return; }
-  if (!view3d) { view3d = true; applyView(); } else { view3d = false; applyView(); }
+/* 顶部横幅 + 右栏竖按钮：都是「进 3D」的入口，3D 不可用时点它们给出原因 */
+[document.getElementById('cta3dBig'), document.getElementById('cta3d')].forEach(el => {
+  if (!el) return;
+  el.addEventListener('click', () => {
+    if (!window.STRATA_3D) { show3dNotice(); return; }
+    view3d = !view3d; applyView();
+  });
 });
 document.getElementById('btnDoor').addEventListener('click', () => window.STRATA_3D && window.STRATA_3D.toggleDoor());
 document.getElementById('btnReset').addEventListener('click', () => window.STRATA_3D && window.STRATA_3D.resetView());

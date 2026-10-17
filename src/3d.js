@@ -174,7 +174,10 @@ function initMaterials() {
   M.meshFilter.map.repeat.set(210 / 56, 470 / 56);
   /* 电源仓观察窗：比侧透玻璃更「实」一点（opacity 0.18），否则在小窗口里几乎看不见 */
   M.glassWin = new THREE.MeshBasicMaterial({ color: 0xbcd8ee, transparent: true, opacity: 0.07, side: THREE.DoubleSide, depthWrite: false });
-  M.pcbMobo = new THREE.MeshStandardMaterial({ color: 0x14161a, roughness: 0.62, map: texCircuit(256, 256, '#14161a', '#2f6b4f') });
+  /* 主板 PCB：贴图底色 #2e3846 已经乘了一次 color，原来又把 color 设成 #14161a，
+     两层相乘后接近纯黑，和机箱内壁糊成一片。改成 color=白，让贴图本色直接出来，
+     取偏蓝的深板岩灰，和机箱的 #171c26/#2a3140 拉开明度。 */
+  M.pcbMobo = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.62, map: texCircuit(256, 256, '#39434f', '#57a985') });
   M.pcbGpu = new THREE.MeshStandardMaterial({ color: 0x131518, roughness: 0.6, map: texCircuit(256, 256, '#131518', '#2a4a44') });
   M.pcbRam = new THREE.MeshStandardMaterial({ color: 0x16181c, roughness: 0.58, map: texCircuit(256, 256, '#16181c', '#6d4a8c') });
   M.alu = new THREE.MeshStandardMaterial({ color: 0x9aa4b2, metalness: 0.9, roughness: 0.3, map: texBrushed('#9aa4b2') });
@@ -575,9 +578,12 @@ function buildMotherboard(m, a) {
   // 24pin + EPS 插座（贴板头一侧）
   g.add(box(8, 45, 24, M.black, 5, y0 + 150, z0 + 8));
   g.add(box(8, 20, 40, M.black, 5, y0 + h - 10, z0 + w - 30));
-  /* 板载丝印：印在 GPU 与 CPU 之间的空白区（x=1.7 板面外侧），从侧透看得到 */
+  /* 板载丝印：印在**内存与第一张显卡之间的空档**（y≈241，x=1.75 板面外侧）。
+     原来在 y=300、z=250，正好被四条内存（z 246…278、x 5…36）整块挡住。
+     y 240 这条带子在第一条 PCIe 槽（顶 228）之上、内存底边（252）之下，
+     z 取 285…329，左右都空着，从侧透看得到。 */
   g.add(decalPlane(44, 11, decalTex('STRATA', m.form + ' · ' + m.socket, { w: 512, h: 128, color: '#cfe4ff' }),
-    1.75, 300, 250, Math.PI / 2));
+    1.75, 241, 307, Math.PI / 2));
   return g;
 }
 
