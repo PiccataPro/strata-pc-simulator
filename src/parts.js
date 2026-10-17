@@ -41,35 +41,35 @@
   const mobos = [
     { id:'z790-gaming-plus', cat:'mobo', name:'微星 Z790 GAMING PLUS WIFI', socket:'LGA1700', ddr:'5', form:'ATX',
       slots:[{pos:1,lanes:16,src:'cpu',gen:4},{pos:4,lanes:4,src:'chipset',gen:4}], dual:[16,4], slotsTotal:2,
-      m2:3, m2Share:null, memSlots:4, chipLanes:12, price:900,
+      m2:3, m2Share:null, memSlots:4, memChan:['A','A','B','B'], chipLanes:12, price:900,
       note:'现板。只有2个卡位；第二槽=芯片组x4（6.6GB/s→frac0.18），双卡必踩坑' },
     { id:'z790-taichi', cat:'mobo', name:'华擎 Z790 Taichi', socket:'LGA1700', ddr:'5', form:'ATX',
       slots:[{pos:1,lanes:16,src:'cpu',gen:5},{pos:4,lanes:8,src:'cpu',gen:5}], dual:[8,8], slotsTotal:3,
-      m2:3, m2Share:null, memSlots:4, chipLanes:12, price:2100,
+      m2:3, m2Share:null, memSlots:4, memChan:['A','A','B','B'], chipLanes:12, price:2100,
       note:'方案E/D配套：双卡 CPU直连 x8/x8 Gen5（各31.5GB/s→frac满分）；二手¥1,800-2,400' },
     { id:'z790-meg-ace', cat:'mobo', name:'微星 MEG Z790 ACE', socket:'LGA1700', ddr:'5', form:'ATX',
       slots:[{pos:1,lanes:16,src:'cpu',gen:5},{pos:4,lanes:8,src:'cpu',gen:5}], dual:[8,8], slotsTotal:3,
-      m2:4, m2Share:null, memSlots:4, chipLanes:12, price:2400,
+      m2:4, m2Share:null, memSlots:4, memChan:['A','A','B','B'], chipLanes:12, price:2400,
       note:'同Taichi：x8/x8 CPU直连；二手¥2,000-2,600' },
     { id:'b760m-mortar', cat:'mobo', name:'微星 B760M 迫击炮', socket:'LGA1700', ddr:'5', form:'mATX',
       slots:[{pos:1,lanes:16,src:'cpu',gen:4},{pos:2,lanes:4,src:'chipset',gen:3}], dual:[16,4], slotsTotal:2,
-      m2:2, m2Share:null, memSlots:4, chipLanes:8, price:400,
+      m2:2, m2Share:null, memSlots:4, memChan:['A','A','B','B'], chipLanes:8, price:400,
       note:'性价比板但双卡第二槽=芯片组x4 Gen3（3.9GB/s，比现板还慢一半）' },
     { id:'x670e-evo', cat:'mobo', name:'华硕 ROG X670E-E GAMING', socket:'AM5', ddr:'5', form:'ATX',
       slots:[{pos:1,lanes:16,src:'cpu',gen:5},{pos:4,lanes:8,src:'cpu',gen:5}], dual:[8,8], slotsTotal:3,
-      m2:4, m2Share:null, memSlots:4, chipLanes:12, price:2300,
+      m2:4, m2Share:null, memSlots:4, memChan:['A','A','B','B'], chipLanes:12, price:2300,
       note:'方案F核心：X670E/X870E才有CPU直连x8/x8第二槽——普通B650/B850第二槽是芯片组x4（同现板坑）' },
     { id:'x870e-creator', cat:'mobo', name:'华硕 ProArt X870E-CREATOR', socket:'AM5', ddr:'5', form:'ATX',
       slots:[{pos:1,lanes:16,src:'cpu',gen:5},{pos:4,lanes:8,src:'cpu',gen:5}], dual:[16,4],  // ProArt: 双卡时第二槽不拆x8而是维持x16+共享（实际手册：x16/x4或x8/x8可选，默认BIOS x8/x8需手动开bifurcation） slotsTotal:2,
-      m2:2, m2Share:{m2:'M.2_2', slot:4, toLanes:4}, memSlots:4, chipLanes:12, price:2500,
+      m2:2, m2Share:{m2:'M.2_2', slot:4, toLanes:4}, memSlots:4, memChan:['A','A','B','B'], chipLanes:12, price:2500,
       note:'隐藏坑：装第二个M.2后第二槽x8→x4（装机模拟器专门复现这个bug给你看）' },
     { id:'b650m-pro', cat:'mobo', name:'微星 B650M PRO', socket:'AM5', ddr:'5', form:'mATX',
       slots:[{pos:1,lanes:16,src:'cpu',gen:4},{pos:2,lanes:4,src:'chipset',gen:4}], dual:[16,4], slotsTotal:2,
-      m2:2, m2Share:null, memSlots:2, chipLanes:8, price:500,
+      m2:2, m2Share:null, memSlots:2, memChan:['A','B'], chipLanes:8, price:500,
       note:'AMD也有坑板：第二槽芯片组x4——"AMD大多支持双x8+x8"是误解，只有E级板才是' },
     { id:'trx40', cat:'mobo', name:'TRX40（线程撕裂者）', socket:'TRX4', ddr:'4', form:'E-ATX',
       slots:[{pos:1,lanes:16,src:'cpu',gen:4},{pos:3,lanes:16,src:'cpu',gen:4},{pos:5,lanes:8,src:'cpu',gen:4}], dual:[16,16,8], slotsTotal:5,
-      m2:3, m2Share:null, memSlots:8, chipLanes:0, price:2600,
+      m2:3, m2Share:null, memSlots:8, memChan:['A','A','B','B','C','C','D','D'], chipLanes:0, price:2600,
       note:'HEDT：三卡x16/x16/x8全CPU直连，但DDR4平台+EPYC/TR贵、单核弱' },
   ];
 
@@ -157,18 +157,28 @@
     return all.find(p => p.id === id) || null;
   }
 
-  /* 内存分析：槽位A1A2B1B2、通道、对称性、实际频率（AM5四槽降3600等） */
+  /* 内存分析：槽位按主板 memChan 布局（典型 A1A2B1B2，索引0=CPU侧最近槽）。
+   * build.ram 为稀疏数组：build.ram[i] = 槽i 的内存条 id 或 null。
+   * 通道 = 同组槽（A组/B组…）各至少 1 条 → 通道数取各组最小值+1 的组数；
+   * 容量对称性按"同组内容量是否一致"判弹性通道。 */
   function analyzeRAM(build, mobo, cpu) {
-    const slots = [null, null, null, null];
-    (build.ram || []).forEach((id, i) => { if (i < mobo.memSlots) slots[i] = byId(id); });
+    const n = mobo.memSlots;
+    const chan = mobo.memChan || Array.from({ length: n }, (_, i) => String.fromCharCode(65 + Math.floor(i / 2)));
+    const slots = Array.from({ length: n }, (_, i) => (build.ram && build.ram[i]) ? byId(build.ram[i]) : null);
     const filled = slots.filter(Boolean);
-    if (!filled.length) return { slots, total: 0, error: '无内存，无法点亮' };
+    if (!filled.length) return { slots, chan, total: 0, error: '无内存，无法点亮' };
     const gen = filled[0].gen;
-    if (filled.some(d => d.gen !== gen)) return { slots, total: filled.reduce((s, d) => s + d.size, 0), error: 'DDR' + gen + '/DDR' + (gen === '4' ? '5' : '4') + ' 混插物理不兼容（防呆口不同位）' };
-    if (!cpu.ddr.includes(gen)) return { slots, total: 0, error: cpu.name + ' 仅支持 ' + cpu.ddr.map(g => 'DDR' + g).join('/') };
+    if (filled.some(d => d.gen !== gen)) return { slots, chan, total: filled.reduce((s, d) => s + d.size, 0), error: 'DDR' + gen + '/DDR' + (gen === '4' ? '5' : '4') + ' 混插物理不兼容（防呆口不同位）' };
+    if (!cpu.ddr.includes(gen)) return { slots, chan, total: 0, error: cpu.name + ' 仅支持 ' + cpu.ddr.map(g => 'DDR' + g).join('/') };
     const sizes = filled.map(d => d.size);
-    const dual = sizes.length >= 2;
-    const symmetric = new Set(sizes).size === 1;
+    /* 通道分组：每组（A/B/C/D…）内至少 1 条才算激活该通道 */
+    const groups = {};
+    slots.forEach((d, i) => { const g = chan[i]; (groups[g] = groups[g] || []).push(d); });
+    const activeCh = Object.values(groups).filter(g => g.some(Boolean)).length;
+    const dual = activeCh >= 2;
+    /* 对称性：各激活通道容量和一致 → 满血对称；否则弹性/降速 */
+    const chSums = Object.values(groups).filter(g => g.some(Boolean)).map(g => g.filter(Boolean).reduce((s, d) => s + d.size, 0));
+    const symmetric = new Set(chSums).size === 1;
     let mt = Math.min(...filled.map(d => d.mt));
     const derates = [];
     if (filled.length === 4) {
@@ -177,10 +187,13 @@
     } else if (filled.length === 3) {
       mt = Math.min(mt, 4800); derates.push('3条非对称→' + mt);
     }
-    if (!symmetric) derates.push('非对称容量→弹性单/双通道混合，带宽-15%');
-    const bw = dual ? mt * 16 / 1000 : mt * 8 / 1000; // DDR5: 单通道64bit=mt×8，双通道×2
+    /* 单通道插法提示：两条同组（如 A1+A2）→ 仍单通道 */
+    if (filled.length === 2 && activeCh === 1) derates.push('两条同通道（' + Object.keys(groups).find(k => groups[k].filter(Boolean).length === 2) + '组）→ 单通道，建议跨 A/B 组插');
+    if (!symmetric && dual) derates.push('通道容量不对称→弹性通道混合，带宽-15%');
+    const bw = dual ? mt * 8 * activeCh / 1000 : mt * 8 / 1000; // 每通道64bit=mt×8 GB/s
     const bwEff = bw * (symmetric ? 1 : 0.85);
-    return { slots, total: sizes.reduce((a, b) => a + b, 0), channels: dual ? (symmetric ? 2 : '1.5') : 1, mt, bw: bwEff, derates,
+    const chanLabel = activeCh >= 2 ? (symmetric ? activeCh + '通道' : '弹性' + (activeCh - 0.5) + '通道') : '单通道';
+    return { slots, chan, total: sizes.reduce((a, b) => a + b, 0), channels: dual ? (symmetric ? activeCh : activeCh - 0.5) : 1, chanLabel, mt, bw: bwEff, derates,
       symmetric, count: filled.length, warn: derates.length ? derates.join('；') : null };
   }
 

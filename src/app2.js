@@ -23,8 +23,10 @@ function updateStatus(a, st) {
   } else c1 = '<h4>CPU</h4><div class="big" style="color:var(--dim)">未装配</div>';
   if (a.ram && !a.ram.error) {
     const r = a.ram;
-    const slotTxt = r.slots.map((d, i) => d ? ('槽' + (i + 1) + ':' + d.size + 'G') : ('槽' + (i + 1) + ':空')).join(' ');
-    c2 = '<h4>内存 · ' + r.total + 'G ' + (r.channels === 2 ? '双通道' : r.channels === 1.5 ? '弹性1.5通道' : '单通道') + '</h4>' +
+    const chan = r.chan || [];
+    const slotName = chan.map((c, i) => c + (chan.slice(0, i + 1).filter(x => x === c).length));
+    const slotTxt = r.slots.map((d, i) => d ? (slotName[i] + ':' + d.size + 'G') : (slotName[i] + ':空')).join(' ');
+    c2 = '<h4>内存 · ' + r.total + 'G ' + r.chanLabel + '</h4>' +
       '<div class="big">DDR' + r.slots.filter(Boolean)[0].gen + ' @ ' + r.mt + ' MT/s · ' + Math.round(r.bw) + 'GB/s</div>' +
       '<div style="font-size:11px;color:var(--dim)">' + slotTxt + ' · ' + (r.symmetric ? '对称插法 ✓' : '非对称混插 ⚠') + '</div>' +
       (r.derates.length ? '<div style="font-size:10.5px;color:var(--warn)">' + r.derates.join('；') + '</div>' : '');
@@ -90,33 +92,39 @@ const log = (t, cls) => {
 };
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+/* boot 代际令牌：点停机/重新开机时递增，使旧的异步 boot 流程在下一个 await 处作废，
+ * 避免"启动动画跑到一半被停止、剩余步骤又把状态改回运行中"的竞态 */
+let bootGen = 0;
 async function boot() {
   const st = settings();
   const a = P.analyze(build, st);
   if (!a.canPost) return;
+  const gen = ++bootGen;
   running = true;
   const btn = document.getElementById('bootBtn');
-  btn.classList.remove('ready'); btn.classList.add('running'); btn.textContent = '运行中';
+  btn.classList.remove('ready'); btn.classList.add('running'); btn.textContent = '停止';
+  btn.title = '点击停止仿真';
   document.getElementById('bootLog').innerHTML = '';
   const v3 = window.STRATA_3D && window.isView3d && window.isView3d();
+  const alive = () => gen === bootGen && running; // 每步 await 后校验，停机即中断
   if (v3) { window.STRATA_3D.sync(build, a); window.STRATA_3D.setPhase('boot'); }
   log('POST：自检开始…');
-  await sleep(500);
+  await sleep(500); if (!alive()) return;
   log('内存训练：' + a.ram.total + 'G @ ' + a.ram.mt + 'MT/s ' + (a.ram.derates.length ? '（' + a.ram.derates.join('；') + '）' : '✓'), a.ram.derates.length ? 'l-w' : 'l-ok');
   /* 插线动画 */
   log('连接供电线：24pin 主板 / EPS CPU / PCIe 显卡…');
   if (v3) window.STRATA_3D.setPhase('cables');
   document.querySelectorAll('#caseSVG .cable').forEach((c, i) => setTimeout(() => c.classList.add('plug'), i * 350));
-  await sleep(v3 ? 2600 : 350 * (document.querySelectorAll('#caseSVG .cable').length + 1));
+  await sleep(v3 ? 2600 : 350 * (document.querySelectorAll('#caseSVG .cable').length + 1)); if (!alive()) return;
   log('安装散热器：' + P.byId(build.cooler).name + ' ✓', 'l-ok');
-  await sleep(400);
+  await sleep(400); if (!alive()) return;
   log('风扇通电：机箱 ' + P.byId(build.case).fans + ' 把 + CPU + 显卡风冷', 'l-ok');
   renderCase(Object.assign(P.analyze(build, st), {})); // 重绘带转扇
   /* 引擎启动 */
   log('strata.exe 启动：--pack ' + (st.model === 'ud_q4' ? 'G:\\llm\\dl\\...\\unsloth-UD-Q4_K_XL' : 'G:\\llm\\Strata-data\\packs\\' + st.model));
-  await sleep(700);
+  await sleep(700); if (!alive()) return;
   const r = S.simulate(build, st);
-  if (!r.ok || !r.m) { log('引擎退出：无可用显示输出', 'l-err'); running = false; btn.textContent = '未就绪'; return; }
+  if (!r.ok || !r.m) { log('引擎退出：无可用显示输出', 'l-err'); shutdown(); return; }
   const m = r.m;
   log('PCIe 探测：' + m.cards.map(c => c.name.split(' ')[0] + ' ' + c.gbps + 'GB/s→frac ' + c.frac).join('，'), m.cards.some(c => c.frac < 0.5) ? 'l-w' : 'l-ok');
   log('layer-split auto：' + (m.dual ? '从 46 种排布选 K 值，双卡流水线' : '单卡') + '；专家装载 显存' + m.vramExperts + 'G + 内存arena ' + m.ramExperts + 'G', m.diskExperts > 0.5 ? 'l-w' : 'l-ok');
@@ -125,11 +133,21 @@ async function boot() {
   if (v3) window.STRATA_3D.setPhase('run');
   /* prefill→decode 灯光模式：前 6s 红脉冲（prefill），后转绿呼吸（decode） */
   window.__inferMode = 'prefill';
-  setTimeout(() => { if (running) window.__inferMode = 'decode'; }, 6000);
+  setTimeout(() => { if (alive()) window.__inferMode = 'decode'; }, 6000);
   renderDash();
-  let dashTimer = window.__dashTimer;
-  if (dashTimer) clearInterval(dashTimer);
+  if (window.__dashTimer) clearInterval(window.__dashTimer);
   window.__dashTimer = setInterval(() => { if (running) renderDash(); }, 2500);
-  log('仿真运行中——改上方 Strata 指标或增删配件，仪表盘实时联动');
+  log('仿真运行中——改上方 Strata 指标或增删配件，仪表盘实时联动；点右侧停止按钮可关机');
 }
-document.getElementById('bootBtn').addEventListener('click', () => { if (!running) boot(); });
+/* 停机：清定时器 + 3D 回 idle + 按钮复位，可再次启动 */
+function shutdown() {
+  bootGen++;
+  running = false;
+  if (window.__dashTimer) { clearInterval(window.__dashTimer); window.__dashTimer = null; }
+  window.__inferMode = 'decode';
+  const v3 = window.STRATA_3D && window.isView3d && window.isView3d();
+  if (v3) window.STRATA_3D.setPhase('idle');
+  log('引擎退出：用户停止仿真（strata.exe 已退出，可改配置后重新启动）', 'l-w');
+  onChange(); // 按钮/风扇/读数回到未运行态
+}
+document.getElementById('bootBtn').addEventListener('click', () => { if (!running) boot(); else shutdown(); });

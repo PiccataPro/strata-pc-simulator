@@ -7,6 +7,7 @@
  */
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
@@ -46,10 +47,11 @@ function initMaterials() {
   M.steel = new THREE.MeshStandardMaterial({ color: 0x2a3140, metalness: 0.75, roughness: 0.42, map: texBrushed('#2a3140') });
   M.steelDark = new THREE.MeshStandardMaterial({ color: 0x171c26, metalness: 0.7, roughness: 0.5 });
   M.mesh = new THREE.MeshStandardMaterial({ color: 0x0c0f15, metalness: 0.4, roughness: 0.8, transparent: true, opacity: 0.88 });
-  M.glass = new THREE.MeshPhysicalMaterial({ color: 0xaaccee, metalness: 0, roughness: 0.05, transmission: 0.92, thickness: 4, transparent: true, opacity: 0.28, side: THREE.DoubleSide });
-  M.pcbMobo = new THREE.MeshStandardMaterial({ color: 0x14202c, roughness: 0.6, map: texCircuit(256, 256, '#14202c', '#3fd68f') });
-  M.pcbGpu = new THREE.MeshStandardMaterial({ color: 0x10141c, roughness: 0.6, map: texCircuit(256, 256, '#10141c', '#54d6c8') });
-  M.pcbRam = new THREE.MeshStandardMaterial({ color: 0x131a28, roughness: 0.55, map: texCircuit(256, 256, '#131a28', '#b98cff') });
+  /* 玻璃侧透：MeshBasicMaterial 最轻（SwiftShader 下 Physical/transmission 都会渲染成灰白块），只留淡蓝 tint */
+  M.glass = new THREE.MeshBasicMaterial({ color: 0x7799bb, transparent: true, opacity: 0.07, side: THREE.DoubleSide, depthWrite: false });
+  M.pcbMobo = new THREE.MeshStandardMaterial({ color: 0x1e3247, roughness: 0.6, map: texCircuit(256, 256, '#1e3247', '#3fd68f') });
+  M.pcbGpu = new THREE.MeshStandardMaterial({ color: 0x1a222e, roughness: 0.6, map: texCircuit(256, 256, '#1a222e', '#54d6c8') });
+  M.pcbRam = new THREE.MeshStandardMaterial({ color: 0x1d2740, roughness: 0.55, map: texCircuit(256, 256, '#1d2740', '#b98cff') });
   M.alu = new THREE.MeshStandardMaterial({ color: 0x9aa4b2, metalness: 0.9, roughness: 0.3, map: texBrushed('#9aa4b2') });
   M.aluDark = new THREE.MeshStandardMaterial({ color: 0x3a4250, metalness: 0.85, roughness: 0.35, map: texBrushed('#3a4250') });
   M.nickel = new THREE.MeshStandardMaterial({ color: 0xc8ccd4, metalness: 1, roughness: 0.22 });
@@ -118,6 +120,63 @@ function fins(count, w, h, d, gap, mat) {
 const rgbs = [];
 function rgbBar(w, h, d, hue) { const m = M.emissive(new THREE.Color().setHSL(hue, 1, 0.55), 2.2); const mesh = box(w, h, d, m, 0, 0, 0); rgbs.push({ mat: m, hue }); return mesh; }
 
+/* ---------------- GLB 资产加载（assets/manifest.js，缺文件回退程序化） ---------------- */
+const gltfLoader = new GLTFLoader();
+const glbCache = new Map(); // url -> Promise<THREE.Group|null>
+const glbStats = { tried: 0, ok: 0, fail: 0 };
+function loadGLB(url) {
+  if (glbCache.has(url)) return glbCache.get(url);
+  glbStats.tried++;
+  const p = new Promise(res => gltfLoader.load(url,
+    g => { glbStats.ok++; res(g.scene); },
+    undefined,
+    () => { glbStats.fail++; res(null); })); // 404/解析失败 → null → 程序化回退
+  glbCache.set(url, p);
+  return p;
+}
+/* 把任意朝向/尺寸的模型标定进目标盒：rot 预旋转 → 居中 → 非等比缩放。
+ * 返回包裹组（局部原点 = 模型中心），调用方负责把它移到装配锚点。 */
+function fitGLB(src, rot, target, matName) {
+  const wrap = new THREE.Group();
+  const inner = new THREE.Group();
+  if (rot) inner.rotation.set(rot[0] || 0, rot[1] || 0, rot[2] || 0);
+  inner.add(src);
+  inner.updateMatrixWorld(true);
+  const b = new THREE.Box3().setFromObject(inner);
+  if (b.isEmpty()) return null;
+  const sz = b.getSize(new THREE.Vector3()), c = b.getCenter(new THREE.Vector3());
+  src.position.sub(c); // 居中到原点
+  inner.scale.set(target.x / (sz.x || 1), target.y / (sz.y || 1), target.z / (sz.z || 1));
+  wrap.add(inner);
+  const mat = (M[matName]) || M.aluDark;
+  wrap.traverse(o => {
+    if (o.isMesh) {
+      o.castShadow = true; o.receiveShadow = true;
+      if (o.geometry && !o.geometry.attributes.normal) o.geometry.computeVertexNormals();
+      o.material = mat; // AI 白模统一套用场景 PBR 材质
+    }
+  });
+  return wrap;
+}
+/* 若 manifest 为该配件登记了 GLB，异步加载并替换程序化几何（保留动画/拾取/线缆锚点）。
+ * 加载失败或无登记 → 静默保留程序化组，永不报错。 */
+function attachGLB(grp, cat, id) {
+  const A = window.STRATA_ASSETS; if (!A || !A.parts) return;
+  const ent = A.parts[id]; if (!ent || ent.noGlb || !ent.glb) return;
+  const anchor = grp.userData.anchor, fitBox = grp.userData.fitBox;
+  if (!anchor || !fitBox) return; // 该类别未提供锚点（主板/内存/散热等）→ 不替换
+  loadGLB(A.baseUrl + ent.glb).then(scene0 => {
+    if (!scene0 || grp.userData._dead) return;
+    const wrap = fitGLB(scene0, ent.rot, fitBox, (A.material || {})[cat]);
+    if (!wrap) return;
+    wrap.position.set(anchor[0], anchor[1], anchor[2]);
+    // 隐藏程序化子件，保留 userData（powerAt/anchor 供线缆与拾取用）
+    grp.children.slice().forEach(ch => { ch.visible = false; });
+    grp.add(wrap);
+    grp.userData.glbWrapped = wrap;
+  });
+}
+
 /* 线缆：CatmullRom 管，非索引化以支持 drawRange 插线动画 */
 function makeCable(pts, r, color) {
   const curve = new THREE.CatmullRomCurve3(pts.map(p => new THREE.Vector3(...p)));
@@ -159,12 +218,15 @@ function buildCasePart(kase) {
     for (let i = 0; i < 3; i++) { const f = makeFan(120, 0x3fb6ff); f.position.set(W / 2, L.topY - 60, 120 + i * 130); g.add(f); }
     const rf = makeFan(120, 0x3fb6ff); rf.rotation.z = Math.PI / 2; rf.position.set(W / 2, 380, 8); g.add(rf);
   }
-  // 玻璃侧透门（绕后上棱旋转开合）
+  // 玻璃侧透门（绕后上棱旋转开合）：整块玻璃 + 四周边框条（不能是实心板，否则挡死内腔）
   const door = new THREE.Group();
   const pane = box(2, H - 20, D - 20, M.glass, 0, 0, 0);
-  const frame = box(6, H - 14, D - 14, M.steelDark, 0, 0, 0); frame.material = M.steel;
-  const pane2 = box(4, H - 24, D - 24, M.glass, 0, 0, 0);
-  door.add(frame); door.add(pane2);
+  door.add(pane);
+  const fw = 14; // 边框条宽
+  door.add(box(8, fw, D - 20, M.steel, 0, (H - 20) / 2 - fw / 2, 0));   // 上
+  door.add(box(8, fw, D - 20, M.steel, 0, -(H - 20) / 2 + fw / 2, 0));  // 下
+  door.add(box(8, H - 20, fw, M.steel, 0, 0, -(D - 20) / 2 + fw / 2));  // 前
+  door.add(box(8, H - 20, fw, M.steel, 0, 0, (D - 20) / 2 - fw / 2));   // 后
   door.position.set(W + 2, H / 2, D / 2);
   door.userData.isDoor = true;
   g.add(door);
@@ -207,6 +269,8 @@ function buildCPU(c) {
   const g = new THREE.Group();
   g.add(box(2, L.cpu.s, L.cpu.s, M.pcbGpu, 4.5, L.cpu.y, L.cpu.z));
   const ihs = box(3.5, L.cpu.s - 12, L.cpu.s - 8, M.nickel, 6.5, L.cpu.y, L.cpu.z); g.add(ihs);
+  g.userData.anchor = [5.5, L.cpu.y, L.cpu.z];
+  g.userData.fitBox = { x: 6, y: L.cpu.s, z: L.cpu.s };
   return g;
 }
 
@@ -255,30 +319,33 @@ function buildGPU(gpu, assign, i) {
   const th = gpu.thick * 20, len = gpu.len, hgt = 112;
   const z0 = L.mobo.z0 + 8;
   const col = assign.slot.frac >= 0.9 ? 0x3fd68f : assign.slot.frac >= 0.5 ? 0xffb454 : 0xff5d6c;
-  // PCB
-  g.add(box(len - 20, 3, hgt - 14, M.pcbGpu, 12 + (len - 20) / 2, slotY + th / 2, z0 + hgt / 2));
-  // 散热罩（金属外壳）
-  const shroud = box(len - 26, th - 4, hgt - 6, M.aluDark, 14 + (len - 26) / 2, slotY + th / 2 + 2, z0 + hgt / 2);
-  g.add(shroud);
-  // 背板
-  g.add(box(len - 16, 1.5, hgt - 2, M.alu, 12 + (len - 16) / 2, slotY + th + 1, z0 + hgt / 2));
-  // 挡板
-  g.add(box(2, th + 14, 120, M.steel, 4, slotY + th / 2, z0 - 4));
-  for (let k = 0; k < 3; k++) g.add(box(3, 8, 16, M.black, 4, slotY + 6 + k * 12, z0 + 14 + k * 20));
-  // 风扇（按长度 2 或 3 把）
+  // 正确朝向：PCB 长度沿 Z（前后），厚度沿 Y（垂直向上），挡板在 Z 尾（后窗）
+  const zc = z0 + len / 2; // 卡中心 z
+  const pcb = box(3, hgt - 14, len - 20, M.pcbGpu, 14, slotY + th / 2, zc); g.add(pcb);
+  // 散热罩（金属外壳，风扇面朝下）
+  g.add(box(30, th - 4, len - 26, M.aluDark, 16, slotY + th / 2 + 2, zc));
+  // 背板（顶部）
+  g.add(box(1.5, hgt - 2, len - 16, M.alu, 30, slotY + th + 1, zc));
+  // 挡板（后窗侧，Z 尾）
+  g.add(box(120, th + 14, 2, M.steel, 4, slotY + th / 2, z0 - 4));
+  for (let k = 0; k < 3; k++) g.add(box(16, 8, 3, M.black, 4 + k * 20, slotY + 6 + k * 12, z0 - 5));
+  // 风扇（朝下，按长度 2 或 3 把）
   const nf = len >= 300 ? 3 : 2;
   for (let k = 0; k < nf; k++) {
     const f = makeFan(Math.min(92, (len - 40) / nf - 8), 0xff4d6d);
-    f.position.set(24 + (k + 0.5) * (len - 48) / nf, slotY - 2, z0 + hgt / 2);
+    f.rotation.x = Math.PI / 2; // 轴向沿 Y，扇面朝下
+    f.position.set(16, slotY - 2, z0 + (k + 0.5) * (len - 48) / nf);
     g.add(f);
   }
-  // 供电口
+  // 供电口（顶部靠尾）
   const is16 = /16pin|12pin/.test(gpu.conn);
-  g.add(box(is16 ? 22 : 14, 8, 12, M.black, len - 26, slotY + th + 6, z0 + hgt - 16));
+  g.add(box(is16 ? 22 : 14, 8, 12, M.black, 22, slotY + th + 6, z0 + len - 30));
   // 侧边 RGB logo 条 + frac 状态灯带
-  const logo = rgbBar(len * 0.35, 2.5, 2.5, 0.95); logo.position.set(20 + len * 0.2, slotY + th + 2, z0 + hgt + 2); g.add(logo);
-  const strip = box(len - 30, 2, 1.5, M.emissive(col, 2), 16 + (len - 30) / 2, slotY - 3, z0 + 4); g.add(strip);
-  g.userData.powerAt = [len - 26, slotY + th + 10, z0 + hgt - 16];
+  const logo = rgbBar(2.5, 2.5, len * 0.35, 0.95); logo.position.set(31, slotY + th + 2, zc); g.add(logo);
+  const strip = box(1.5, 2, len - 30, M.emissive(col, 2), 8, slotY - 3, zc); g.add(strip);
+  g.userData.powerAt = [22, slotY + th + 10, z0 + len - 30];
+  g.userData.anchor = { x: 14, y: slotY + th / 2, z: zc }; // GLB 装配锚点（卡几何中心）
+  g.userData.fitBox = { x: 34, y: th, z: len };
   return g;
 }
 
@@ -301,6 +368,8 @@ function buildPSU(p) {
   const gr = cyl(60, 2, M.black, 28); gr.rotation.x = Math.PI / 2; gr.position.set(95, 45, 20 + len + 1); g.add(gr);
   const f = makeFan(120, 0xffd166); f.rotation.x = Math.PI / 2; f.position.set(95, 45, 20 + len - 6); g.add(f);
   g.add(box(60, 2, 40, M.emissive(0xffd166, 0.9), 95, 88, 60)); // 标签灯
+  g.userData.anchor = [95, 45, 20 + len / 2];
+  g.userData.fitBox = { x: 150, y: 85, z: len };
   return g;
 }
 
@@ -323,15 +392,17 @@ function init(el) {
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0b0f16);
   camera = new THREE.PerspectiveCamera(42, 1, 1, 6000);
-  camera.position.set(560, 420, 700);
+  camera.position.set(760, 560, 980);
   controls = new OrbitControls(camera, renderer.domElement);
   controls.target.set(100, 240, 230); controls.enableDamping = true; controls.dampingFactor = 0.08;
   controls.maxDistance = 1800; controls.minDistance = 120;
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-  scene.add(new THREE.HemisphereLight(0x8899bb, 0x223344, 0.5));
-  const key = new THREE.DirectionalLight(0xffffff, 1.4); key.position.set(600, 800, 500); scene.add(key);
-  const fill = new THREE.DirectionalLight(0x6688cc, 0.5); fill.position.set(-400, 200, -300); scene.add(fill);
+  scene.add(new THREE.HemisphereLight(0x99aacc, 0x334455, 1.1));
+  const key = new THREE.DirectionalLight(0xffffff, 2.2); key.position.set(600, 800, 500); scene.add(key);
+  const fill = new THREE.DirectionalLight(0x88aaee, 0.9); fill.position.set(-400, 200, -300); scene.add(fill);
+  const rim = new THREE.DirectionalLight(0xffffff, 0.7); rim.position.set(-200, 300, 800); scene.add(rim);
+  scene.add(new THREE.AmbientLight(0x445566, 0.8));
   composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, camera));
   bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.42, 0.6, 0.82);
@@ -365,7 +436,7 @@ function sync(build, a) {
   if (build.cpu) want.set(keyOf('cpu', 0, build.cpu), { cat: 'cpu', idx: 0, id: build.cpu });
   if (build.cooler) want.set(keyOf('cooler', 0, build.cooler), { cat: 'cooler', idx: 0, id: build.cooler });
   if (build.psu) want.set(keyOf('psu', 0, build.psu), { cat: 'psu', idx: 0, id: build.psu });
-  build.ram.forEach((id, i) => want.set(keyOf('ram', i, id), { cat: 'ram', idx: i, id }));
+  build.ram.forEach((id, i) => { if (id) want.set(keyOf('ram', i, id), { cat: 'ram', idx: i, id }); });
   build.ssd.forEach((id, i) => want.set(keyOf('ssd', i, id), { cat: 'ssd', idx: i, id }));
   a.gpuAssign.forEach((g, i) => want.set(keyOf('gpu', i, g.id), { cat: 'gpu', idx: i, id: g.id, assign: g }));
   // 拆除
@@ -384,6 +455,7 @@ function sync(build, a) {
     scene.add(grp);
     installed.set(k, { group: grp, cat: v.cat, idx: v.idx, id: v.id });
     playIn(grp, v.cat);
+    attachGLB(grp, v.cat, v.id); // 有登记 GLB 则异步替换程序化几何（失败静默回退）
   }
   rebuildPickables();
   rebuildCables();
@@ -451,8 +523,8 @@ function rebuildCables() {
   gpuInsts.forEach((v, idx) => {
     const gpu = P.byId(v.id);
     const ga = analyze_ref.gpuAssign[idx]; if (!ga) return;
-    const slotY = L.pcieY[ga.slotPos] || 150;
-    const cg = makeCable([[120, 88, 200], [150, 150, 260], [140, slotY + gpu.thick * 20 + 10, L.mobo.z0 + gpu.len - 6], [gpu.len - 26, slotY + gpu.thick * 20 + 6, L.mobo.z0 + 8 + gpu.len - 32]], 4, 0x2a2418);
+    const pa = v.group.userData.powerAt || [22, 200, 300]; // 供电口（新朝向：长度沿Z）
+    const cg = makeCable([[120, 88, 200], [150, 150, 280], [120, pa[1] + 30, pa[2] - 40], pa], 4, 0x2a2418);
     cg.userData.label = 'gpu'; cableMeshes.push(cg);
   });
   cableMeshes.forEach(c => { c.userData.plugged = phase !== 'idle'; scene.add(c); applyPlug(c); });
@@ -607,7 +679,12 @@ function toggleDoor() {
   requestAnimationFrame(step);
 }
 function resetView() {
-  camera.position.set(560, 420, 700); controls.target.set(100, 240, 230);
+  camera.position.set(760, 560, 980); controls.target.set(100, 240, 230);
 }
 
-window.STRATA_3D = { init, sync, setPhase, setTelemetry, toggleDoor, resetView, onRemove: cb => removeCb = cb };
+window.STRATA_3D = { init, sync, setPhase, setTelemetry, toggleDoor, resetView, onRemove: cb => removeCb = cb,
+  /* 无头验证探针：装配件清单 + GLB 命中数 */
+  debugState: () => ({
+    installed: [...installed.values()].map(v => ({ cat: v.cat, idx: v.idx, id: v.id, glb: !!(v.group.userData && v.group.userData.glbWrapped) })),
+    glb: glbStats, phase, ready,
+  }) };

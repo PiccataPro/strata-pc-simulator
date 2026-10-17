@@ -28,7 +28,7 @@ function totalPrice() {
   if (build.psu) s += P.byId(build.psu).price;
   if (build.cooler) s += P.byId(build.cooler).price;
   if (build.case) s += P.byId(build.case).price;
-  build.ram.forEach(r => s += P.byId(r).price);
+  build.ram.filter(Boolean).forEach(r => s += P.byId(r).price);
   build.gpu.forEach(g => s += P.byId(g).price);
   build.ssd.forEach(x => s += P.byId(x).price);
   return s;
@@ -40,14 +40,14 @@ function renderShelves() {
   /* 单件制品类：装了就置灰；多件制（内存/显卡/SSD）：显示已装×N，到上限才置灰 */
   const inUse = new Set([build.cpu, build.mobo, build.psu, build.cooler, build.case].filter(Boolean));
   const cnt = {};
-  [].concat(build.ram, build.gpu, build.ssd).forEach(id => { cnt[id] = (cnt[id] || 0) + 1; });
+  [].concat(build.ram.filter(Boolean), build.gpu, build.ssd).forEach(id => { cnt[id] = (cnt[id] || 0) + 1; });
   const half = Math.ceil(CATS.length / 2);
   [[document.getElementById('shelfL'), CATS.slice(0, half)], [document.getElementById('shelfR'), CATS.slice(half)]].forEach(([el, cats]) => {
     el.innerHTML = '';
     cats.forEach(c => {
       const h = document.createElement('h3'); h.textContent = c.t; el.appendChild(h);
       P[c.arr].forEach(p => {
-        const n = cnt[p.id] || 0, lim = MULTI[c.k];
+        const n = cnt[p.id] || 0, lim = c.k === 'ram' ? ramSlotCount() : MULTI[c.k]; // 内存上限=当前主板槽数
         const d = document.createElement('div');
         d.className = 'part cat-' + c.k + ((inUse.has(p.id) || (lim && n >= lim)) ? ' inuse' : '');
         d.draggable = true; d.dataset.id = p.id; d.dataset.cat = c.k;
@@ -69,16 +69,34 @@ function renderShelves() {
   });
 }
 
-/* ---- 装配/拆除 ---- */
-function install(id, cat) {
-  if (cat === 'ram') { if (build.ram.length < 4) build.ram.push(id); }
+/* ---- 装配/拆除 ----
+ * 内存为槽位制：build.ram 稀疏数组，build.ram[i]=null|条id，i=物理槽（A1A2B1B2…）。
+ * 自动落位优先 A2/B2（每通道第2槽，主板手册推荐首选），再 A1/B1。 */
+function ramSlotCount() { const m = build.mobo ? P.byId(build.mobo) : null; return m ? m.memSlots : 4; }
+function ramPickSlot() {
+  const n = ramSlotCount();
+  const order = [];
+  for (let i = 0; i < n; i++) if (i % 2 === 1) order.push(i); // 各组第2槽优先（A2,B2,C2…）
+  for (let i = 0; i < n; i++) if (i % 2 === 0) order.push(i); // 再第1槽（A1,B1…）
+  for (const i of order) if (!build.ram[i]) return i;
+  return -1;
+}
+function install(id, cat, slotIdx) {
+  if (cat === 'ram') {
+    const n = ramSlotCount();
+    while (build.ram.length < n) build.ram.push(null);
+    const i = (slotIdx != null && slotIdx >= 0 && slotIdx < n) ? slotIdx : ramPickSlot();
+    if (i < 0) return;
+    build.ram[i] = id; // 占用槽→替换
+  }
   else if (cat === 'gpu') { if (build.gpu.length < 2) build.gpu.push(id); }
   else if (cat === 'ssd') { if (build.ssd.length < 4) build.ssd.push(id); }
   else build[cat] = id;
   onChange();
 }
 function removePart(cat, idx) {
-  if (cat === 'ram' || cat === 'gpu' || cat === 'ssd') build[cat].splice(idx, 1);
+  if (cat === 'ram') { build.ram[idx] = null; onChange(); return; }
+  if (cat === 'gpu' || cat === 'ssd') build[cat].splice(idx, 1);
   else build[cat] = null;
   onChange();
 }
@@ -109,6 +127,7 @@ function renderCase(a) {
   const svg = document.getElementById('caseSVG');
   const G = SLOT_GEO;
   let s = '';
+  let slotName = []; // 内存槽名（A1A2B1B2…），供空槽点击处理器闭包引用
   /* 机箱框架 */
   s += '<rect x="30" y="30" width="620" height="500" rx="16" fill="#151b27" stroke="#3a475c" stroke-width="3"/>';
   s += '<rect x="42" y="42" width="596" height="476" rx="10" fill="#0e131d" stroke="#232d3f"/>';
@@ -126,15 +145,18 @@ function renderCase(a) {
       s += '<rect x="' + g.x + '" y="' + g.y + '" width="' + g.w + '" height="' + g.h + '" rx="3" fill="#0a0f18" stroke="' + col + '" stroke-width="1.6"/>';
       s += '<text x="' + (g.x + g.w + 6) + '" y="' + (g.y + 15) + '" fill="' + col + '" font-size="10">槽' + p.pos + ' x' + p.lanes + ' Gen' + p.gen + ' · ' + p.gbps + 'GB/s · frac ' + p.frac + (p.src === 'chipset' ? ' 芯片组' : '') + '</text>';
     });
-    /* 内存槽 */
+    /* 内存槽（稀疏槽位制：索引0=CPU侧最近槽；同字母=同通道，典型 A1A2B1B2） */
+    const chan = m.memChan || Array.from({ length: m.memSlots }, (_, i) => String.fromCharCode(65 + Math.floor(i / 2)));
+    slotName = chan.map((c, i) => c + (chan.slice(0, i + 1).filter(x => x === c).length));
     for (let i = 0; i < m.memSlots; i++) {
-      const g = G.ramSlots[i];
+      const x = 400 + i * 18;
       const filled = build.ram[i];
-      s += '<rect x="' + g.x + '" y="' + g.y + '" width="10" height="120" rx="2" fill="' + (filled ? '#2a1f45' : '#0a0f18') + '" stroke="' + (filled ? '#b98cff' : '#39465c') + '"' + (filled ? ' class="partBox" data-cat="ram" data-idx="' + i + '"' : '') + '/>';
+      s += '<rect x="' + x + '" y="92" width="10" height="120" rx="2" fill="' + (filled ? '#2a1f45' : '#0a0f18') + '" stroke="' + (filled ? '#b98cff' : '#39465c') + '" stroke-dasharray="' + (filled ? 'none' : '4 3') + '"' + (filled ? ' class="partBox" data-cat="ram" data-idx="' + i + '"' : ' class="ramSlotEmpty" data-slot="' + i + '"') + '/>';
+      s += '<text x="' + (x + 5) + '" y="' + (92 + 128) + '" fill="' + (filled ? '#b98cff' : '#5c6b82') + '" font-size="8" text-anchor="middle" pointer-events="none">' + slotName[i] + '</text>';
     }
-    if (build.ram.length && a.ram && !a.ram.error) {
+    if (build.ram.filter(Boolean).length && a.ram && !a.ram.error) {
       const rr = a.ram;
-      s += '<text x="' + G.ramSlots[0].x + '" y="' + (G.ramSlots[0].y + 136) + '" fill="#b98cff" font-size="10">' + rr.total + 'G ' + (rr.channels === 2 ? '双通道' : rr.channels === 1.5 ? '弹性1.5通道' : '单通道') + ' @' + rr.mt + (rr.derates.length ? ' ⚠' : '') + '</text>';
+      s += '<text x="' + G.ramSlots[0].x + '" y="' + (G.ramSlots[0].y + 148) + '" fill="#b98cff" font-size="10">' + rr.total + 'G ' + rr.chanLabel + ' @' + rr.mt + (rr.derates.length ? ' ⚠' : '') + '</text>';
     }
     /* M.2 */
     build.ssd.forEach((x, i) => {
@@ -221,6 +243,28 @@ function renderCase(a) {
       ev.dataTransfer.setData('text/plain', 'REMOVE:' + el.dataset.cat + ':' + (el.dataset.idx || ''));
     });
     el.setAttribute('draggable', 'true');
+  });
+  /* 空内存槽：可直接把内存条拖到指定槽位（选择具体槽 A1A2B1B2） */
+  svg.querySelectorAll('.ramSlotEmpty').forEach(el => {
+    el.style.cursor = 'copy';
+    el.addEventListener('dragover', ev => { ev.preventDefault(); ev.stopPropagation(); el.setAttribute('stroke', '#e0c4ff'); el.setAttribute('stroke-width', '2.5'); });
+    el.addEventListener('dragleave', ev => { el.setAttribute('stroke', '#39465c'); el.setAttribute('stroke-width', '1'); });
+    el.addEventListener('drop', ev => {
+      ev.preventDefault(); ev.stopPropagation();
+      const id = ev.dataTransfer.getData('text/plain');
+      const p = P.byId(id); if (!p || p.cat !== 'ram') return;
+      install(p.id, 'ram', +el.dataset.slot);
+    });
+    /* 点击空槽 → 从已装货架类型里选一条插入（无则提示先拖一条到别的槽） */
+    el.addEventListener('click', ev => {
+      ev.stopPropagation();
+      const types = [...new Set([].concat(build.ram, []).filter(Boolean))];
+      if (!types.length) { alert('先把一条内存拖到任意槽，再点其它空槽即可复制插入'); return; }
+      const nm = types.map((t, i) => (i + 1) + '. ' + P.byId(t).name).join('\n');
+      const pick = prompt('插入到槽 ' + slotName[+el.dataset.slot] + '，选择序号：\n' + nm, '1');
+      if (pick == null) return;
+      const t = types[(+pick || 1) - 1]; if (t) install(t, 'ram', +el.dataset.slot);
+    });
   });
 }
 
