@@ -7,6 +7,8 @@
 [![依赖](https://img.shields.io/badge/%E8%BF%90%E8%A1%8C%E6%97%B6%E4%BE%9D%E8%B5%96-0-8b98ab?style=flat-square)](package.json)
 [![验算](https://img.shields.io/badge/%E6%A8%A1%E5%9E%8B%E9%AA%8C%E7%AE%97-36_%E9%A1%B9%E5%85%A8%E7%BB%BF-3fd68f?style=flat-square)](test.js)
 
+> **非官方社区工具。** 与 [Strata](https://github.com/Niko1221/Strata) 官方项目无隶属关系——这是一个*为* Strata 做的模拟器，用它的公开实测与社区 benchmark 报告校准。
+
 **装一台能跑本地大模型的机器，先看清楚它能跑多快。** 把真实配件拖进机箱、按下启动键，实时观察 decode 吞吐 / prefill / 首字延迟 / 专家驻留 / 温度功耗如何随硬件与推理参数变化——模型以 [Strata](https://github.com/Niko1221/Strata) MoE 推理引擎的真实实测数据校准。
 
 - **买对的那张卡，而不是更大的那张**：第二张卡插进芯片组 `x4` 槽，整机可能被 `pcie_frac 0.25` 悄悄锁死。

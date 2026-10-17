@@ -7,6 +7,8 @@
 [![Dependencies](https://img.shields.io/badge/runtime_deps-0-8b98ab?style=flat-square)](package.json)
 [![Checks](https://img.shields.io/badge/model_checks-36_passing-3fd68f?style=flat-square)](test.js)
 
+> **Unofficial community tool.** Not affiliated with the [Strata](https://github.com/Niko1221/Strata) project — this is a simulator *for* Strata, calibrated against its published measurements and community benchmark reports.
+
 **A 3D PC builder that predicts your local LLM tokens/sec.** Drag real parts into the case, press power, and watch decode throughput, prefill, time-to-first-token, expert residency, thermals and wall power respond to both your hardware *and* your inference settings — calibrated against real measurements from the [Strata](https://github.com/Niko1221/Strata) MoE inference engine.
 
 - **Buy the right part, not the bigger part.** A second GPU in a chipset `x4` slot can silently cap your whole system at `pcie_frac 0.25`.
