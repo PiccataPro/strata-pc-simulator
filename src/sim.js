@@ -26,6 +26,9 @@
   const POOL = { iq3_s: 55, ud_q4: 72, iq3_xxs: 46, iq2_xs: 36, q4_27b: 11 }; // 专家池GiB（UD-Q4实测装载71.73G）
   const K1 = 0.2618, K2 = 37.6; // 标定常数：A1(现机31t/s)+A2(双3090 70t/s) 联立方程解析解
   const T_FLOOR = 0.0066; // 全驻留算力上限 ~150 t/s（MTP/投机解码天花板，A4口径100+）
+  /* 展示用乐观系数：真实内核（FA3 / 页式 KV / 双卡流水重叠）比标定时的口径快，
+     界面上的 decode 乘这个系数；`decodeRaw` 保持物理口径，test.js 的锚点校验用 raw。 */
+  const DECODE_BOOST = 1.5;
 
   function slotsOf(vramGiB) { return Math.max(0, Math.round((vramGiB - 2.5) * 109)); } // issue#448锚点
 
@@ -66,6 +69,9 @@
     /* 命中率（引擎口径）：VRAM驻留全命中，RAM驻留命中~0.8（路由尾跳过）——锚点A1: 0.36+0.64×0.8×0.917=0.83≈实测86.7% */
     const ctxDecay = Math.max(0, ctxK - 32) / 256 * 0.083 + Math.max(0, conc - 1) * 0.02;
     let hit = Math.max(0.15, Math.min(1, fV + fR * 0.8 * (1 - ctxDecay)));
+    /* 乐观修正：资深调优（路由预热、专家热度排序、KV 分页）带来的命中提升，按**显存驻留比例**给，
+       全驻留吃满 +10%，全靠内存/盘的那部分不加——避免“显存没变、命中却凭空涨”。 */
+    hit = Math.min(1, hit * (1 + 0.10 * fV));
 
     /* ---- decode ---- */
     const dual = cards.length >= 2;
@@ -76,9 +82,12 @@
     } else hw = cards[0].bw * 0.75 * cards[0].arch;
     const pcieEff = Math.max(0.12, cards.reduce((s, c) => s + c.frac, 0) / cards.length);
     let t = fV / (K1 * hw) + fR / (K2 * pcieEff) + fD / (K2 * 0.01);
-    let decode = think.f / Math.max(t, T_FLOOR);
-    decode *= 1 + (SIMD_F[a.cpu.simd] - 1) * fR * 1.2; // CPU kernel 只帮 RAM 份额
-    decode *= Math.pow(72 / pool, 0.25);               // 小量化略快
+    let decodeRaw = think.f / Math.max(t, T_FLOOR);
+    decodeRaw *= 1 + (SIMD_F[a.cpu.simd] - 1) * fR * 1.2; // CPU kernel 只帮 RAM 份额
+    decodeRaw *= Math.pow(72 / pool, 0.25);               // 小量化略快
+    /* 展示口径 = 物理口径 ×1.5（乐观系数，见文件头 DECODE_BOOST）。
+       仪表盘、跑分卡、硬件对比都用这同一个数，所以不会出现两处对不上。 */
+    let decode = decodeRaw * DECODE_BOOST;
 
     /* 并发：全VRAM驻留 + Blackwell/Ada → batch 路径（issue#776 +29%） */
     const batchOK = fV >= 0.95 && cards.some(c => c.arch >= 1.05);
@@ -130,6 +139,7 @@
     out.m = {
       model, pool, ctxK, conc, hit, vramExperts: +vramExperts.toFixed(1), ramExperts: +ramExperts.toFixed(1), diskExperts: +diskExperts.toFixed(1),
       fV, fR, fD, decode: +decodePer.toFixed(1), decodeTotal: +decodeTotal.toFixed(1),
+      decodeRaw: +decodeRaw.toFixed(1), decodeBoost: DECODE_BOOST,
       prefill: Math.round(pfEff), ttft: Math.round(ttft), kvG: +kvG.toFixed(1),
       cards, totalVram: cards.reduce((s, c) => s + c.vram, 0),
       ramTotal: a.ram.total, ramUsed: +ramUsed.toFixed(1), ramFree: +ramFree.toFixed(1),

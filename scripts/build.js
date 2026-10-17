@@ -22,6 +22,17 @@ html = html.replace(/<script src="([^"]+)"><\/script>/g, (m, file) => {
   return '<script>\n' + js + '\n</script>';
 });
 
+/* 语法自检：内联前先确认这段 JS 能被解析。
+ * 用 new Function 只做编译不执行，所以不会碰到 document/THREE。 */
+function assertParses(js, what) {
+  try {
+    new Function(js);
+  } catch (e) {
+    console.error('build 失败：' + what + ' 不是合法 JS —— ' + e.message);
+    process.exit(1);
+  }
+}
+
 /* 3D 模块：esbuild 打包 three + addons + 3d.js → iife 内联（单文件版离线可用） */
 function findEsbuild() {
   const exe = process.platform === 'win32' ? 'esbuild.exe' : 'esbuild';
@@ -86,7 +97,17 @@ if (moduleTag.test(html)) {
     fs.unlinkSync(tmp);
     console.log('OK → 3D 模块已 esbuild 内联（' + (js.length / 1024).toFixed(0) + ' KB）');
   }
-  html = html.replace(moduleTag, '<script>\n' + js + '\n</script>');
+  /* 必须用**函数替换**，不能直接传字符串：
+     String.replace 会把替换串里的 `$&` / `$'` / `` $` `` / `$1` 当成特殊模式。
+     esbuild 压缩后的变量名可能以 `$` 结尾（如 `Se=$&&!!T.clearcoatRoughnessMap`），
+     其中 `$&` 一旦命中，就会把「整个 importmap + module 标签」原样嵌进 JS 中间，
+     产物看着有 1MB，实际语法全废——GitHub Pages 上点 3D 报的就是这个。 */
+  assertParses(js, '3D bundle');
+  html = html.replace(moduleTag, () => '<script>\n' + js + '\n</script>');
+  if (/<script type="importmap">/.test(html)) {
+    console.error('build 失败：产物里仍残留 importmap，说明 3D 模块没有被内联');
+    process.exit(1);
+  }
 }
 
 if (/<script src=/.test(html)) {

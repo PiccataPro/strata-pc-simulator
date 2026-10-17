@@ -28,6 +28,7 @@ const EXPOSE = [
   'L', 'M', 'initMaterials', 'THREE', 'DOOR_HINGE_FRONT', 'DOOR_SWING',
 ];
 let src = fs.readFileSync(path.join(srcDir, '3d.js'), 'utf8');
+src = src.replace("from './texdata.js'", "from '" + path.join(srcDir, 'texdata.js').replace(/\\/g, '/') + "'");
 src += '\nwindow.__AUDIT = { ' + EXPOSE.join(', ') + ' };\n';
 const entry = path.join(tmpDir, '3d-audit.js');
 fs.writeFileSync(entry, src);

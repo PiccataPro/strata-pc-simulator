@@ -349,6 +349,7 @@ function applyView() {
       window.STRATA_3D.setPhase(running ? 'run' : 'idle');
     }
   }
+  mark3dState();
 }
 /* ---- 3D 不可用时的诊断 ----
  * 以前这里只是一句 alert('3D 模块未加载')，看不出到底哪里错了。
@@ -377,15 +378,40 @@ function show3dNotice() {
 }
 function mark3dState() {
   const b = document.getElementById('btnView');
-  if (!b) return;
-  if (window.STRATA_3D) {
-    b.classList.remove('off');
-    b.title = '';
-    b.textContent = view3d ? '⇄ 切回 2D' : '⇄ 切到 3D';
-  } else {
-    b.classList.add('off');
-    b.textContent = '⇄ 3D 不可用';
-    b.title = why3dUnavailable();
+  const cta = document.getElementById('cta3d');
+  const ok = !!window.STRATA_3D;
+  if (b) {
+    if (ok) {
+      b.classList.remove('off');
+      b.title = '';
+      b.textContent = view3d ? '⇄ 切回 2D' : '⇄ 切到 3D';
+    } else {
+      b.classList.add('off');
+      b.textContent = '⇄ 3D 不可用';
+      b.title = why3dUnavailable();
+    }
+  }
+  /* 右栏那颗大按钮：3D 可用时跟随视图状态换文案，不可用时置灰并说明原因 */
+  if (cta) {
+    cta.classList.toggle('off', !ok);
+    cta.classList.toggle('on', ok && view3d);
+    const t = cta.querySelector('.t'), s = cta.querySelector('.s'), ic = cta.querySelector('.ic');
+    if (!ok) {
+      ic.textContent = '⚠';
+      t.textContent = '3D 不可用';
+      s.textContent = '点击查看原因';
+      cta.title = why3dUnavailable();
+    } else if (view3d) {
+      ic.textContent = '▦';
+      t.textContent = '切回 2D 平面图';
+      s.textContent = '回到装配视图继续换件';
+      cta.title = '';
+    } else {
+      ic.textContent = '⬢';
+      t.textContent = '进入 3D 实景装机台';
+      s.textContent = '真机模型 · 玻璃侧透 · 可拆可装';
+      cta.title = '';
+    }
   }
 }
 function toggleView() {
@@ -393,6 +419,10 @@ function toggleView() {
   view3d = !view3d; applyView();
 }
 document.getElementById('btnView').addEventListener('click', toggleView);
+document.getElementById('cta3d').addEventListener('click', () => {
+  if (!window.STRATA_3D) { show3dNotice(); return; }
+  if (!view3d) { view3d = true; applyView(); } else { view3d = false; applyView(); }
+});
 document.getElementById('btnDoor').addEventListener('click', () => window.STRATA_3D && window.STRATA_3D.toggleDoor());
 document.getElementById('btnReset').addEventListener('click', () => window.STRATA_3D && window.STRATA_3D.resetView());
 /* 模块是异步加载的：等 load 之后再看一眼 STRATA_3D 在不在，不在就把按钮标灰。 */

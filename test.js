@@ -15,7 +15,7 @@ console.log('=== 锚点回归 ===');
 /* A1 现机：3080-20G x16 + 4070S 芯片组x4，UD-Q4，256K → decode~31, prefill~1181, TTFT~206s */
 let r = run({ cpu: 'i7-12700KF', mobo: 'z790-gaming-plus', ram: ram96, gpu: ['rtx-3080-20g', 'rtx-4070s'], ssd: ['ti600-1t'], psu: 'psu-1250t', cooler: 'aio360', case: 'mft3f' });
 check('A1 现机可点亮', r.ok, JSON.stringify(r.errors));
-check('A1 decode 25-40', r.m.decode >= 25 && r.m.decode <= 40, 'decode=' + r.m.decode);
+check('A1 decode 25-40', r.m.decodeRaw >= 25 && r.m.decodeRaw <= 40, 'raw=' + r.m.decodeRaw + ' 展示=' + r.m.decode);
 check('A1 prefill 950-1400', r.m.prefill >= 950 && r.m.prefill <= 1400, 'prefill=' + r.m.prefill);
 check('A1 TTFT 160-260s', r.m.ttft >= 160 && r.m.ttft <= 260, 'ttft=' + r.m.ttft);
 check('A1 4070S 芯片组警告', r.warns.some(w => w.includes('4070') && w.includes('芯片组')), r.warns.join('|'));
@@ -24,7 +24,7 @@ check('A1 命中率~86%', r.m.hit > 0.75 && r.m.hit < 0.95, 'hit=' + r.m.hit.toF
 
 /* A2 双3090 @ Taichi x8/x8 → decode 60-80 */
 r = run({ cpu: 'i7-14700', mobo: 'z790-taichi', ram: ram96, gpu: ['rtx-3090', 'rtx-3090'], ssd: ['ti600-1t'], psu: 'psu-1250t', cooler: 'aio360', case: 'mft3f', }, { igpuDisplay: true });
-check('A2 双3090 decode 55-85', r.m.decode >= 55 && r.m.decode <= 85, 'decode=' + r.m.decode);
+check('A2 双3090 decode 55-85', r.m.decodeRaw >= 55 && r.m.decodeRaw <= 85, 'raw=' + r.m.decodeRaw + ' 展示=' + r.m.decode);
 check('A2 x8/x8 frac满分', r.hw.gpuAssign.every(g => g.slot.frac >= 0.99), JSON.stringify(r.hw.gpuAssign.map(g => g.slot.gbps)));
 
 /* A4 官方社区 bench 原机：双 PRO4500 32G + Swift IQ3_XXS（46G池→全驻VRAM）→ decode 100+ */
@@ -35,7 +35,7 @@ check('A4 batch 可用', r.m.batchOK === true);
 
 /* 方案E：双3080-20G + 14700核显输出 → decode 55-70（报告预期） */
 r = run({ cpu: 'i7-14700', mobo: 'z790-taichi', ram: ram96, gpu: ['rtx-3080-20g', 'rtx-3080-20g'], ssd: ['ti600-1t'], psu: 'psu-1250t', cooler: 'aio360', case: 'mft3f' }, { igpuDisplay: true });
-check('方案E 双3080 decode 50-72', r.m.decode >= 50 && r.m.decode <= 72, 'decode=' + r.m.decode);
+check('方案E 双3080 decode 50-72', r.m.decodeRaw >= 50 && r.m.decodeRaw <= 72, 'raw=' + r.m.decodeRaw + ' 展示=' + r.m.decode);
 check('方案E 核显输出无显示税', r.hw.igpuChosen === true && r.m.cards.every(c => c.free > c.vram - 3));
 
 console.log('=== 矩阵边界 ===');

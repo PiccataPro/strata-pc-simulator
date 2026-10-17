@@ -23,6 +23,24 @@ header .tag{font-size:11px;color:var(--dim)}
 /* ---- 三栏布局 ---- */
 #main{display:grid;grid-template-columns:270px 1fr 270px;gap:10px;padding:10px 16px}
 .shelf{display:flex;flex-direction:column;gap:8px;max-height:calc(100vh - 210px);overflow-y:auto;padding-right:4px}
+/* 右栏：顶部一个巨大的 3D 入口，下面才是货架 */
+#railR{display:flex;flex-direction:column;gap:10px;min-width:0;max-height:calc(100vh - 210px)}
+#railR .shelf{max-height:none;flex:1;min-height:0}
+#cta3d{position:relative;flex:0 0 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  width:100%;padding:16px 10px 14px;border-radius:12px;cursor:pointer;overflow:hidden;
+  border:1px solid #2f6fa8;background:linear-gradient(160deg,#123049 0%,#0d2033 55%,#0a1725 100%);
+  color:#e8f4ff;box-shadow:0 0 0 1px #0a1a2a inset,0 10px 26px #0007;transition:border-color .18s,transform .12s}
+#cta3d:hover{border-color:var(--acc);transform:translateY(-1px)}
+#cta3d:active{transform:translateY(0)}
+#cta3d .ic{font-size:30px;line-height:1;color:#7fd1ff;text-shadow:0 0 16px #3fb6ff88}
+#cta3d .t{font-size:14.5px;font-weight:700;letter-spacing:.6px}
+#cta3d .s{font-size:10.5px;color:#8fb4d4;letter-spacing:.3px}
+#cta3d::after{content:"";position:absolute;inset:-40% -60%;background:linear-gradient(115deg,transparent 42%,#7fd1ff22 50%,transparent 58%);transform:translateX(-60%);transition:transform .7s}
+#cta3d:hover::after{transform:translateX(60%)}
+#cta3d.on{background:linear-gradient(160deg,#0d2033,#09141f);border-color:#39465c}
+#cta3d.on .ic{color:#5c6b82;text-shadow:none}
+#cta3d.off{opacity:.5;cursor:not-allowed}
+#cta3d.off:hover{transform:none;border-color:#39465c}
 .shelf h3{font-size:12px;color:var(--dim);border-left:3px solid var(--acc);padding-left:6px;margin-top:4px}
 .part{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:7px 9px;cursor:grab;user-select:none;transition:.15s}
 .part:hover{border-color:var(--acc);transform:translateY(-1px)}
@@ -162,7 +180,7 @@ footer{display:flex;align-items:center;gap:16px;padding:12px 16px;background:var
       </div>
       <svg id="caseSVG" viewBox="0 0 760 560"></svg>
       <div id="case3d">
-        <div id="hint3d">拖动旋转视角・滚轮缩放・点玻璃开合侧盖・点配件移除・拖出机箱外也拆・点台面上的零件装回</div>
+        <div id="hint3d">拖动旋转视角・滚轮缩放・点玻璃开合侧盖・点配件移除・拖出机箱外也拆・点台面上的零件装回・开盖后透过电源仓玻璃窗可直接选中电源</div>
         <div id="benchOv">
           <div class="card">
             <div class="ttl">StrataBench 跑分</div>
@@ -177,7 +195,14 @@ footer{display:flex;align-items:center;gap:16px;padding:12px 16px;background:var
     <div id="readouts"></div>
     <div id="dash"></div>
   </div>
-  <div class="shelf" id="shelfR"></div>
+  <div id="railR">
+    <button id="cta3d" type="button">
+      <span class="ic">⬢</span>
+      <span class="t">进入 3D 实景装机台</span>
+      <span class="s">真机模型 · 玻璃侧透 · 可拆可装</span>
+    </button>
+    <div class="shelf" id="shelfR"></div>
+  </div>
 </div>
 
 <footer>

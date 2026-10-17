@@ -4,3 +4,6 @@ Thumbs.db
 *.log
 
 scripts/shots/
+
+# 本地渲染输出
+tmp/

@@ -12,6 +12,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { PANEL_NORMAL_PNG, PANEL_ROUGH_PNG } from './texdata.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 const P = window.STRATA_PARTS;
@@ -70,9 +71,98 @@ function texMeshFilter() {
   t.anisotropy = 4;
   return t;
 }
+/* 喷砂 / 粉末涂层的微观法线贴图（程序化）。
+ * 用 DataTexture 而不是 canvas：不依赖 2D API，Node 侧的几何审计也能安全执行。
+ * 两层 value noise（低频＝喷涂橘皮）+ 逐像素细颗粒（砂面），中心差分求法线。 */
+function hash2(x, y, seed) {
+  let h = Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263) + Math.imul(seed | 0, 1442695041);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+function texGrainNormal(size, cellPx, amp, seed) {
+  const S = size, hgt = new Float32Array(S * S);
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const gx = x / cellPx, gy = y / cellPx;
+    const x0 = Math.floor(gx), y0 = Math.floor(gy), fx = gx - x0, fy = gy - y0;
+    const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+    const n00 = hash2(x0, y0, seed), n10 = hash2(x0 + 1, y0, seed);
+    const n01 = hash2(x0, y0 + 1, seed), n11 = hash2(x0 + 1, y0 + 1, seed);
+    const low = (n00 * (1 - sx) + n10 * sx) * (1 - sy) + (n01 * (1 - sx) + n11 * sx) * sy;
+    hgt[y * S + x] = low + hash2(x + 7919, y + 104729, seed + 31) * 0.55;
+  }
+  const at = (x, y) => hgt[((y % S + S) % S) * S + ((x % S + S) % S)];
+  const data = new Uint8Array(S * S * 4);
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const dx = (at(x - 1, y) - at(x + 1, y)) * amp;
+    const dy = (at(x, y - 1) - at(x, y + 1)) * amp;
+    const len = Math.hypot(dx, dy, 1), i = (y * S + x) * 4;
+    data[i] = Math.round((dx / len * 0.5 + 0.5) * 255);
+    data[i + 1] = Math.round((dy / len * 0.5 + 0.5) * 255);
+    data[i + 2] = Math.round((1 / len * 0.5 + 0.5) * 255);
+    data[i + 3] = 255;
+  }
+  const t = new THREE.DataTexture(data, S, S, THREE.RGBAFormat);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.magFilter = THREE.LinearFilter;
+  t.minFilter = THREE.LinearMipmapLinearFilter;
+  t.generateMipmaps = true;
+  t.needsUpdate = true;
+  return t;
+}
 function initMaterials() {
-  M.steel = new THREE.MeshStandardMaterial({ color: 0x2a3140, metalness: 0.75, roughness: 0.42, map: texBrushed('#2a3140') });
-  M.steelDark = new THREE.MeshStandardMaterial({ color: 0x171c26, metalness: 0.7, roughness: 0.5 });
+  /* 由真实产品照片推导的颗粒贴图（见 texdata.js）。
+   * 只挂 normalMap / roughnessMap，不动 color 和 metalness —— 这两张图里没有颜色信息，
+   * 所以不可能像上一轮那样把整机箱改黑。Node 审计环境没有 Image，loadTex 返回 null，
+   * 参数就退回纯程序化，几何计算不受影响。 */
+  const texOff = typeof location !== 'undefined' && /(^|[?&])notex\b/.test(location.search);
+  const loadTex = (url, rep) => {
+    if (texOff || typeof Image === 'undefined') return null;
+    try {
+      const t = new THREE.TextureLoader().load(url);
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.repeat.set(rep, rep);
+      t.anisotropy = 4;
+      return t;
+    } catch (e) { return null; }
+  };
+  M.__panelN = loadTex(PANEL_NORMAL_PNG, 4);
+  M.__panelR = loadTex(PANEL_ROUGH_PNG, 4);
+  M.__grain = texGrainNormal(256, 22, 3.4, 7);
+  const grain = (mat, mm, ns) => {
+    const t = M.__grain.clone();
+    t.needsUpdate = true;
+    t.repeat.set(220 / mm, 220 / mm);          // 220mm = 机箱特征尺寸，按实际毫米排布
+    mat.normalMap = t;
+    mat.normalScale = new THREE.Vector2(ns, ns);
+    return mat;
+  };
+  /* 四档灰拉开层次（数值越大越亮）：
+   *   0x171c26 内框/加强筋  →  0x2a3140 主体钢板  →  0x333b48 电源仓罩  →  0x3c4554 前面板折边 */
+  M.steel = grain(new THREE.MeshStandardMaterial({
+    color: 0x2a3140, metalness: 0.75, roughness: 0.42, map: texBrushed('#2a3140'),
+  }), 30, 0.32);
+  M.steelDark = grain(new THREE.MeshStandardMaterial({
+    color: 0x171c26, metalness: 0.7, roughness: 0.5,
+  }), 34, 0.30);
+  M.shroud = grain(new THREE.MeshStandardMaterial({
+    color: 0x333b48, metalness: 0.66, roughness: 0.46,
+  }), 44, 0.34);
+  M.edge = grain(new THREE.MeshStandardMaterial({
+    color: 0x3c4554, metalness: 0.82, roughness: 0.27, map: texBrushed('#3c4554'),
+  }), 26, 0.22);
+  /* 折边高光：真实机箱的钣金折边会被磨亮一圈，比四周亮两档、粗糙度更低 */
+  M.chamfer = new THREE.MeshStandardMaterial({ color: 0x5a6577, metalness: 0.92, roughness: 0.18 });
+  /* 机箱的三块大面（主体 / 折边料 / 电源仓罩）换成照片推导的颗粒；
+     小件（内框、加强筋）保留程序化颗粒，避免同一张图大量重复时出现明显阵列感。 */
+  if (M.__panelN) {
+    [M.steel, M.edge, M.shroud].forEach(m => {
+      m.normalMap = M.__panelN;
+      m.normalScale.set(0.5, 0.5);
+      if (M.__panelR) m.roughnessMap = M.__panelR;
+      m.needsUpdate = true;
+    });
+    console.log('3D: 机箱面板已使用照片推导贴图（?notex 可关闭对比）');
+  }
   M.mesh = new THREE.MeshStandardMaterial({ color: 0x0c0f15, metalness: 0.4, roughness: 0.8, transparent: true, opacity: 0.88 });
   /* 玻璃侧透：MeshBasicMaterial 最轻（SwiftShader 下 Physical/transmission 都会渲染成灰白块），只留淡蓝 tint */
   M.glass = new THREE.MeshBasicMaterial({ color: 0x7799bb, transparent: true, opacity: 0.07, side: THREE.DoubleSide, depthWrite: false });
@@ -83,15 +173,18 @@ function initMaterials() {
   });
   M.meshFilter.map.repeat.set(210 / 56, 470 / 56);
   /* 电源仓观察窗：比侧透玻璃更「实」一点（opacity 0.18），否则在小窗口里几乎看不见 */
-  M.glassWin = new THREE.MeshBasicMaterial({ color: 0xa8c8e4, transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false });
-  M.pcbMobo = new THREE.MeshStandardMaterial({ color: 0x1e3247, roughness: 0.6, map: texCircuit(256, 256, '#1e3247', '#3fd68f') });
-  M.pcbGpu = new THREE.MeshStandardMaterial({ color: 0x1a222e, roughness: 0.6, map: texCircuit(256, 256, '#1a222e', '#54d6c8') });
-  M.pcbRam = new THREE.MeshStandardMaterial({ color: 0x1d2740, roughness: 0.55, map: texCircuit(256, 256, '#1d2740', '#b98cff') });
+  M.glassWin = new THREE.MeshBasicMaterial({ color: 0xbcd8ee, transparent: true, opacity: 0.07, side: THREE.DoubleSide, depthWrite: false });
+  M.pcbMobo = new THREE.MeshStandardMaterial({ color: 0x14161a, roughness: 0.62, map: texCircuit(256, 256, '#14161a', '#2f6b4f') });
+  M.pcbGpu = new THREE.MeshStandardMaterial({ color: 0x131518, roughness: 0.6, map: texCircuit(256, 256, '#131518', '#2a4a44') });
+  M.pcbRam = new THREE.MeshStandardMaterial({ color: 0x16181c, roughness: 0.58, map: texCircuit(256, 256, '#16181c', '#6d4a8c') });
   M.alu = new THREE.MeshStandardMaterial({ color: 0x9aa4b2, metalness: 0.9, roughness: 0.3, map: texBrushed('#9aa4b2') });
   M.aluDark = new THREE.MeshStandardMaterial({ color: 0x3a4250, metalness: 0.85, roughness: 0.35, map: texBrushed('#3a4250') });
   M.nickel = new THREE.MeshStandardMaterial({ color: 0xc8ccd4, metalness: 1, roughness: 0.22 });
   M.gold = new THREE.MeshStandardMaterial({ color: 0xd4af37, metalness: 1, roughness: 0.3 });
   M.black = new THREE.MeshStandardMaterial({ color: 0x0a0d12, roughness: 0.7 });
+  /* 显卡外壳：真实非公卡（如 Gigabyte EAGLE）是**中性中灰塑料**，不是蓝灰金属 */
+  M.gpuBody = new THREE.MeshStandardMaterial({ color: 0x50545b, metalness: 0.28, roughness: 0.56 });
+  M.fanBladeDark = new THREE.MeshStandardMaterial({ color: 0x24272c, roughness: 0.5 });
   M.rubber = new THREE.MeshStandardMaterial({ color: 0x111318, roughness: 0.95 });
   M.fanBlade = c => M.fanBlade['c' + c] || (M.fanBlade['c' + c] = new THREE.MeshStandardMaterial({ color: c, transparent: true, opacity: 0.82, roughness: 0.35 }));
   M.emissive = (c, i) => { const m = new THREE.MeshStandardMaterial({ color: 0x05070a, emissive: c, emissiveIntensity: i || 1.4, roughness: 0.4 }); return m; };
@@ -130,6 +223,42 @@ const L = {
 /* ---------------- 通用小件 ---------------- */
 function box(w, h, d, mat, x, y, z) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); return m; }
 function cyl(r, h, mat, seg = 24) { return new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, seg), mat); }
+
+/* ---------------- 贴花（丝印 / 铭牌 / LOGO） ----------------
+ * 不引外部图片：canvas 现画文字，透明底，贴在各部件的平面外侧 0.3mm 处。
+ * 用 MeshBasicMaterial 是为了保证在暗场景里也读得出来（丝印本身就是高反射的白漆）。 */
+function decalTex(main, sub, opts) {
+  const o = opts || {};
+  const W = o.w || 512, H = o.h || 128;
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  g.clearRect(0, 0, W, H);
+  g.fillStyle = o.color || '#e8eef7';
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  const f1 = o.font || ('700 ' + Math.round(H * (sub ? 0.42 : 0.55)) + 'px "Segoe UI",Arial,sans-serif');
+  g.font = f1;
+  g.fillText(main, W / 2, sub ? H * 0.38 : H * 0.52);
+  if (sub) {
+    g.font = '500 ' + Math.round(H * 0.24) + 'px "Segoe UI",Arial,sans-serif';
+    g.globalAlpha = 0.62;
+    g.fillText(sub, W / 2, H * 0.72);
+    g.globalAlpha = 1;
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  return t;
+}
+/* w/h 单位 mm；ry=π/2 时面朝 +X（从侧透看过去正读） */
+function decalPlane(w, h, tex, x, y, z, ry) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({
+    map: tex, transparent: true, alphaTest: 0.06, depthWrite: false, opacity: 0.92,
+  }));
+  m.position.set(x, y, z);
+  m.rotation.y = ry || 0;
+  m.userData.noShadow = true;
+  return m;
+}
 
 /* 风扇：frame + 叶轮(注册到 fans[]) + LED 环 */
 const fans = [];
@@ -319,11 +448,18 @@ function buildCasePart(kase) {
   g.add(box(th, H, D, M.steel, -th / 2, H / 2, D / 2));            // 右（主板托盘侧）
   /* 另一侧端面：四条边框（原来是 box(6,H,th+6)——只有 6mm 宽，看起来像机箱中间竖着一根杆）。 */
   const bz = 16, fzP = -3, fthP = th + 6;
-  g.add(box(W + 8, bz, fthP, M.steelDark, W / 2, H - bz / 2, fzP));   // 上
-  g.add(box(W + 8, bz, fthP, M.steelDark, W / 2, bz / 2, fzP));       // 下
-  g.add(box(bz, H, fthP, M.steelDark, bz / 2, H / 2, fzP));           // 左
-  g.add(box(bz, H, fthP, M.steelDark, W - bz / 2, H / 2, fzP));       // 右
-  g.add(box(W + 8, 14, 10, M.steelDark, W / 2, H + 7, -3));     // 顶沿
+  g.add(box(W + 8, bz, fthP, M.edge, W / 2, H - bz / 2, fzP));   // 上（折边料，比主体亮一档）
+  g.add(box(W + 8, bz, fthP, M.edge, W / 2, bz / 2, fzP));       // 下
+  g.add(box(bz, H, fthP, M.edge, bz / 2, H / 2, fzP));           // 左
+  g.add(box(bz, H, fthP, M.edge, W - bz / 2, H / 2, fzP));       // 右
+  g.add(box(W + 8, 14, 10, M.edge, W / 2, H + 7, -3));     // 顶沿
+  /* 折边高光：沿外轮廓加 1.8mm 的亮边（顶前棱 + 两条前立柱 + 仓罩前唇），
+     相当于真实钣金折边被磨亮的那一圈，用来勾出机箱轮廓。 */
+  const CH = 1.8;
+  g.add(box(W + 12, CH, CH, M.chamfer, W / 2, H + 2.2, -7.9));      // 顶前棱
+  g.add(box(CH, H + 2, CH, M.chamfer, -4.2, H / 2, -7.9));          // 左前立柱
+  g.add(box(CH, H + 2, CH, M.chamfer, W + 4.2, H / 2, -7.9));       // 右前立柱
+  g.add(box(W - 6, CH, CH, M.chamfer, (W) / 2, L.psuShroud.h + 2.6, 140.6)); // 电源仓罩前唇
   /* 前置金属网防尘板：铺满进风面，网孔用 alphaTest 镂空（真·透孔，不是半透明）。
      放在 z=0.5，正好落进四条边框的厚度里（-7.5…1.5），四周被边框压住，不会露毛边。 */
   const filt = new THREE.Mesh(new THREE.PlaneGeometry(W, H), M.meshFilter);
@@ -331,16 +467,21 @@ function buildCasePart(kase) {
   filt.userData.noShadow = true;           // 镂空面投影会糊成一整块黑板，跳过投影
   g.add(filt);
   // 电源仓罩（跟着电源一起挪到 Z 尾部侧）
-  const sh = box(W - 14, 4, L.psuShroud.z, M.steel, (W - 14) / 2 + 4, L.psuShroud.h, D - L.psuShroud.z / 2);
+  const sh = box(W - 14, 4, L.psuShroud.z, M.shroud, (W - 14) / 2 + 4, L.psuShroud.h, D - L.psuShroud.z / 2);
   g.add(sh);
   /* 电源仓侧板：改成「四条框 + 中间玻璃观察窗」。
      窗洞 z 200…410（正对电源本体 232…444）、y 12…78，四周留 40/10/12 的框边。 */
   const shX = W - 12, shZ0 = D - L.psuShroud.z;   // 侧板所在 x=198，罩体起点 z=140
-  g.add(box(4, L.psuShroud.h, 60, M.steelDark, shX, L.psuShroud.h / 2, shZ0 + 30));          // 前段框
-  g.add(box(4, L.psuShroud.h, 40, M.steelDark, shX, L.psuShroud.h / 2, D - 20));             // 尾段框
-  g.add(box(4, 10, 210, M.steelDark, shX, 83, 305));                                        // 上框（78…88，贴罩顶）
-  g.add(box(4, 12, 210, M.steelDark, shX, 6, 305));                                         // 下框
-  g.add(box(1.6, 66, 210, M.glassWin, shX, 45, 305));                                       // 观察窗玻璃
+  g.add(box(4, L.psuShroud.h, 60, M.shroud, shX, L.psuShroud.h / 2, shZ0 + 30));            // 前段框
+  g.add(box(4, L.psuShroud.h, 40, M.shroud, shX, L.psuShroud.h / 2, D - 20));               // 尾段框
+  g.add(box(4, 10, 210, M.shroud, shX, 83, 305));                                          // 上框（78…88，贴罩顶）
+  g.add(box(4, 12, 210, M.shroud, shX, 6, 305));                                           // 下框
+  /* 观察窗玻璃：标成 isShroudGlass，射线打上去不能停在这块玻璃上——
+     要穿过去命中后面的电源（否则永远只能选中整只机箱）。
+     透明度也压到 0.07，接近真机上的亚克力/钢化玻璃，能看清电源本体的铭牌。 */
+  const glassWin = box(1.6, 66, 210, M.glassWin, shX, 45, 305);
+  glassWin.userData.isShroudGlass = true;
+  g.add(glassWin);
   /* 窗框：一圈 1.5mm 亮边，让玻璃有「装进去」的厚度感 */
   g.add(box(1.5, 1.5, 212, M.nickel, shX + 1.7, 78.4, 305));
   g.add(box(1.5, 1.5, 212, M.nickel, shX + 1.7, 11.6, 305));
@@ -348,6 +489,9 @@ function buildCasePart(kase) {
   g.add(box(1.5, 68, 1.5, M.nickel, shX + 1.7, 45, 409.6));
   // 罩上 RGB 装饰条（Strata logo 带）：让到窗洞前面，别横穿玻璃
   const strip = rgbBar(2, 3, 46, 0.55); strip.position.set(W - 11, 30, 170); g.add(strip);
+  /* 机箱铭牌贴花：印在电源仓侧板前段（透过侧透玻璃能看到，正对机箱前部） */
+  g.add(decalPlane(52, 13, decalTex('STRATA', 'MFT-3F', { w: 512, h: 128, color: '#dce6f2' }),
+    200.4, 52, 172, Math.PI / 2));
   // 主板铜柱
   for (const [my, mz] of [[130, 60], [130, 260], [390, 60], [390, 260], [260, 60]]) {
     const st = cyl(3, 8, M.gold, 10); st.rotation.z = Math.PI / 2; st.position.set(3, my, D - mz); g.add(st);
@@ -386,15 +530,15 @@ function buildMotherboard(m, a) {
   const g = new THREE.Group();
   const { y0, z0, w, h } = L.mobo;
   const pcb = box(1.6, h, w, M.pcbMobo, 0.8, y0 + h / 2, z0 + w / 2); g.add(pcb);
-  /* 尾部 I/O 护罩：贴板最尾缘（z 420…444），让开 CPU 和水冷头 */
-  g.add(box(14, 40, 24, M.aluDark, 8, y0 + h - 20, z0 + w - 12));
+  /* 尾部 I/O 护罩：真板（如 ROG STRIX）是一整块**银色铝**，比我们原来的深色小方块大得多 */
+  g.add(box(16, 35, 66, M.alu, 8, y0 + h - 18, z0 + w - 36));
   /* 顶部供电模块：6 片，整体贴到与主板顶沿齐平（y 385…415），
      不再和内存条在 z 方向上堆叠 */
   g.add(fins(6, 12, 30, 6, 4, M.alu).translateX(10).translateY(y0 + h - 15).translateZ(320));
   /* 芯片组（南北桥）：梯形散热片，放在 CPU 下方 —— 用 Shape + 挤出做真正的梯形截面 */
   const cs = new THREE.Shape();
   cs.moveTo(-32, -18); cs.lineTo(32, -18); cs.lineTo(24, 18); cs.lineTo(-24, 18); cs.closePath();
-  const chip = new THREE.Mesh(new THREE.ExtrudeGeometry(cs, { depth: 9, bevelEnabled: false }), M.aluDark);
+  const chip = new THREE.Mesh(new THREE.ExtrudeGeometry(cs, { depth: 9, bevelEnabled: false }), M.alu);
   chip.rotation.y = Math.PI / 2;      // 截面贴主板（YZ 面），厚度沿 +X
   chip.position.set(3, 288, 360);
   g.add(chip);
@@ -418,6 +562,9 @@ function buildMotherboard(m, a) {
   // 24pin + EPS 插座（贴板头一侧）
   g.add(box(8, 45, 24, M.black, 5, y0 + 150, z0 + 8));
   g.add(box(8, 20, 40, M.black, 5, y0 + h - 10, z0 + w - 30));
+  /* 板载丝印：印在 GPU 与 CPU 之间的空白区（x=1.7 板面外侧），从侧透看得到 */
+  g.add(decalPlane(44, 11, decalTex('STRATA', m.form + ' · ' + m.socket, { w: 512, h: 128, color: '#cfe4ff' }),
+    1.75, 300, 250, Math.PI / 2));
   return g;
 }
 
@@ -450,12 +597,18 @@ function buildCooler(co) {
   } else {
     const copper = M.copper || (M.copper = new THREE.MeshStandardMaterial({ color: 0xb87333, metalness: 1, roughness: 0.35 }));
     g.add(box(6, 40, 40, copper, 12, L.cpu.y - 24, L.cpu.z));   // 底座
-    const towerH = co.id === 'ag400' ? 140 : 150;
+    /* 塔体：鳍片沿 Z 叠成一块 finX(X) × towerH(Y) 的方块。
+       宽度按真机规格：NH-D15 150mm、PA120SE 125mm、利民 AX120 120mm。
+       （高度没敢照抄 165mm —— 见下面 height 那行的说明。） */
+    const finX = co.id === 'd15' ? 150 : co.id === 'pa120se' ? 125 : 120;
+    const fanD = co.id === 'd15' ? 140 : 120;
+    /* 高度受机箱限制：本机箱内腔 470 高，CPU 中心在 352，到顶只剩 118mm。
+       真机 D15 是 165mm，照抄会直接顶穿顶板，所以这里按可用净空压到 150。 */
+    const towerH = co.id === 'd15' ? 150 : 150;
     const nT = co.id === 'd15' || co.id === 'pa120se' ? 2 : 1;
-    /* 塔体：鳍片沿 Z 叠成一块 130(X) × towerH(Y) 的方块。
-       塔心稍微前移（cz），否则 118~160mm 深的塔体会顶穿机箱后窗。
-       原来鳍片宽只给了 12mm（贴着主板一道竖片），等于没有塔体。 */
-    const finX = 130, nFin = nT === 2 ? 10 : 19, pitch = 5 + 1.2;
+    /* 塔体：鳍片沿 Z 叠成一块 finX(X) × towerH(Y) 的方块。
+       塔心稍微前移（cz），否则 118~160mm 深的塔体会顶穿机箱后窗。 */
+    const nFin = nT === 2 ? 10 : 19, pitch = 5 + 1.2;
     const depth = nFin * pitch;
     const cz = L.cpu.z - (nT === 2 ? 8 : 4);
     for (let t = 0; t < nT; t++) {
@@ -464,7 +617,7 @@ function buildCooler(co) {
       g.add(f);
     }
     // 风扇正对塔体吹（轴向沿 Z）。原来绕 Z 转了 90°，变成朝侧透吹
-    const fan = makeFan(120, 0x7fd1ff);
+    const fan = makeFan(fanD, 0x7fd1ff);
     fan.rotation.x = Math.PI / 2;
     fan.position.set(14 + finX / 2, L.cpu.y + 40, cz - (nT === 1 ? depth / 2 + 15 : depth + 26));
     g.add(fan);
@@ -482,21 +635,39 @@ function buildDIMM(d, i) {
    *   Z = 1.6mm PCB 厚度（槽距方向）
    * 旧版把 31mm 写成了 2mm，整条就只剩 133×7 的一根棍子。 */
   const X0 = 5, HGT = 31, PCB = 1.6;
+  /* 马甲颜色按套条区分：真实市场里同一容量就有黑 / 白两种马甲（海盗船 LPX 黑、复仇者 RGB 白） */
+  const white = /d5-32|d4-32/.test(d.id);
+  const armor = white
+    ? new THREE.MeshStandardMaterial({ color: 0xd8dbe1, metalness: 0.55, roughness: 0.34 })
+    : new THREE.MeshStandardMaterial({ color: 0x2d3036, metalness: 0.72, roughness: 0.42 });
   g.add(box(HGT, L.dimm.h, PCB, M.pcbRam, X0 + HGT / 2, yc, z));                 // PCB
-  g.add(box(HGT - 4, L.dimm.h - 8, 2, M.aluDark, X0 + HGT / 2, yc, z - 1.9));    // 马甲（前）
-  g.add(box(HGT - 4, L.dimm.h - 8, 2, M.aluDark, X0 + HGT / 2, yc, z + 1.9));    // 马甲（后）
+  g.add(box(HGT - 4, L.dimm.h - 8, 2, armor, X0 + HGT / 2, yc, z - 1.9));        // 马甲（前）
+  g.add(box(HGT - 4, L.dimm.h - 8, 2, armor, X0 + HGT / 2, yc, z + 1.9));        // 马甲（后）
+  /* 马甲侧面的竖向鳍片：真马甲是一排冲压出来的立筋，平板上看只有明暗条纹 */
+  for (let k = 0; k < 6; k++) {
+    const rx = X0 + 3 + k * ((HGT - 8) / 5);
+    g.add(box(1.6, L.dimm.h - 14, 1.2, armor, rx, yc, z - 3.1));
+    g.add(box(1.6, L.dimm.h - 14, 1.2, armor, rx, yc, z + 3.1));
+  }
   /* 顶部 RGB 导光条：沿 Y 铺在离板最远的那条边上 */
   const bar = rgbBar(4, L.dimm.h - 16, 6, (i * 0.13) % 1);
   bar.position.set(X0 + HGT - 2, yc, z); g.add(bar);
   return g;
 }
 
+/* 显卡卡高（金手指平面 → 卡顶，沿 X）。
+ * 来源：NVIDIA 官方规格页 —— RTX 4090 FE 304×137×61；RTX 3080 FE 285×112×40。
+ * 之前所有卡都写死 112mm，结果 4090 这种三槽高卡和 3080 一样薄，和实物比例明显不符。 */
+const GPU_HGT = {
+  'rtx-3080-10g': 112, 'rtx-3080-20g': 120, 'rtx-3090': 120, 'rtx-2080ti-22g': 112,
+  'rtx-4070s': 130, 'rtx-4090': 137, 'rtx-5090': 137, 'rtx-pro-4500': 112, 'rtx-a6000': 112,
+};
 function buildGPU(gpu, assign, i) {
   const g = new THREE.Group();
   const slotY = L.pcieY[assign.slotPos] || L.pcieY[4];
   const th = gpu.thick * 20;              // 厚度（沿 Y）：2 槽 40 / 3 槽 60
   const len = gpu.len;                    // 长度（沿 Z）
-  const HGT = 112;                        // 高度（沿 X）：从金手指平面到卡顶
+  const HGT = GPU_HGT[gpu.id] || 112;     // 高度（沿 X）：从金手指平面到卡顶
   const x0 = 4;                           // 金手指平面（插槽内的位置）
   const x1 = x0 + HGT;                    // 卡顶，朝侧透一侧
   const xc = (x0 + x1) / 2;
@@ -511,18 +682,23 @@ function buildGPU(gpu, assign, i) {
    * 旧版把「厚度」当成了 X、「高度」当成了 Y，整张卡是竖着贴在主板上的，
    * 于是挡板横穿机箱、风扇圆心落在托盘里、卡体只有 30mm 厚却堆了 98mm 高。 */
   g.add(box(HGT - 8, 1.6, len - 14, M.pcbGpu, xc, slotY, zc));                        // PCB
-  g.add(box(HGT - 12, th - 12, len - 22, M.aluDark, xc, botY + 12 + (th - 12) / 2, zc)); // 散热罩
+  g.add(box(HGT - 12, th - 12, len - 22, M.gpuBody, xc, botY + 12 + (th - 12) / 2, zc)); // 散热罩（中性灰塑料）
   g.add(box(HGT - 16, 1.5, len - 18, M.alu, xc, slotY + 2.3, zc));                    // 背板
   // 挡板（XY 平面，贴尾部墙面）
   g.add(box(HGT, th + 10, 2, M.steel, xc, slotY - th / 2 + 5, zR + 3));
   // 挡板开孔示意（DP/HDMI）
   for (let k = 0; k < 3; k++) g.add(box(12, 8, 3.5, M.black, x1 - 12 - k * 16, slotY - th / 2 + 6, zR + 3));
   // 风扇：轴沿 Y 朝下。makeFan 本身就在 XZ 平面上，不需要再绕 X 转
+  /* 真实非公卡（EAGLE / TUF / Gaming OC）是**黑色扇叶 + 浅灰轴心圆标**，
+     不是彩色叶片。LED 圈留在风扇外沿，只在开机时亮。 */
   const nf = len >= 300 ? 3 : 2;
   for (let k = 0; k < nf; k++) {
     const d = Math.min(92, (len - 40) / nf - 8);
-    const f = makeFan(d, 0xff4d6d);
+    const f = makeFan(d, 0x3a3f47);
     f.position.set(xc, botY + 6, zR - 12 - (k + 0.5) * (len - 40) / nf);
+    const cap = cyl(d * 0.17, 1.4, M.alu, 20);            // 轴心圆标
+    cap.position.set(0, -d * 0.06 - 0.6, 0);
+    f.add(cap);
     g.add(f);
   }
   // 供电口：装在卡**边缘朝侧透那侧**（原来在 slotY-12，埋在散热罩里面，线根本插不进去）
@@ -532,6 +708,15 @@ function buildGPU(gpu, assign, i) {
   // 侧边 RGB logo 条 + frac 状态灯带
   const logo = rgbBar(2.5, 2.5, len * 0.35, 0.95); logo.position.set(x1 - 2, slotY - 4, zc); g.add(logo);
   const strip = box(1.5, 2, len - 30, M.emissive(col, 2), x1 - 3, slotY - 2, zc); g.add(strip);
+  /* 贴花：卡顶朝侧透那面印型号 + 显存/供电，真实显卡的丝印就在这个位置 */
+  /* 卡顶边缘的银色拉丝饰条 —— 真卡（EAGLE / ROG）外缘都有一条拉丝铝 */
+  g.add(box(0.7, th * 0.5, len - 34, M.alu, x1 + 0.35, slotY - th / 2, zc));
+  g.add(decalPlane(Math.min(64, len * 0.34), 9,
+    decalTex(gpu.name, gpu.vram + 'GB · ' + gpu.conn, { w: 512, h: 96 }),
+    x1 + 0.78, slotY - th / 2, zc, Math.PI / 2));
+  /* 折边高光：卡体外侧上下两条棱（真卡的散热罩折边会磨出一圈亮线） */
+  g.add(box(1.4, 1.4, len - 18, M.chamfer, x1 - 0.4, slotY + 2.4, zc));
+  g.add(box(1.4, 1.4, len - 18, M.chamfer, x1 - 0.4, slotY - th + 2.4, zc));
   /* 线缆插点：在卡的 +X 外侧，留 4mm 让插头露在卡外，线从外面横着插进来 */
   g.userData.powerAt = [x1 + 4, slotY + 8, connZ];
   g.userData.frontZ = zR - len;          // 卡前缘（走线竖井判断是否被长卡占满）
@@ -567,6 +752,9 @@ function buildPSU(p) {
      不然从窗口看进去只有一个纯黑的铁盒子，看不出是电源。 */
   g.add(box(0.8, 30, 84, M.emissive(0xc8d8e8, 0.22), 170.4, y + 6, zR - len / 2));       // 铭牌
   g.add(box(0.9, 4, 44, M.black, 170.5, y + 16, zR - len / 2));                            // 铭牌上的黑色标题条
+  /* 铭牌贴花：型号 + 瓦数，透过电源仓观察窗能看到 */
+  g.add(decalPlane(70, 22, decalTex(p.name, p.w + 'W · 80PLUS GOLD', { w: 512, h: 160, color: '#dfe8f4' }),
+    171.1, y + 4, zR - len / 2, Math.PI / 2));
   for (let i = 0; i < 4; i++) g.add(box(0.8, 9, 15, M.black, 170.5, y - 20, zR - 34 - i * 19)); // 模组接口
   g.userData.anchor = [95, y, zR - len / 2];
   g.userData.fitBox = { x: 150, y: 85, z: len };
@@ -827,13 +1015,19 @@ let cableMeshes = [];
 function planCables(ctx) {
   const { psuFrontZ, hasCpu, gpus, gpusFront } = ctx;
   const PF = psuFrontZ + 4;            // 刚出电源前面板
-  /* 竖井放哪一侧：显卡不超过 ~300mm 时，卡前缘在 z≈136 之外，z=126 这条通道
-     刚好在卡前面，走 x≈26 最贴边；一旦装了 400mm 级别的长卡，卡前缘会顶到 z≈24，
-     整条前侧通道全被占满，只能改走 x=126（卡外侧、贴近玻璃那面）。 */
-  const CX = (gpusFront != null && gpusFront < 120) ? 126 : 26;
+  /* 竖井的 x 必须按**实际卡高**算，不能写死：
+   * 卡高（金手指→卡顶）从统一的 112 改成按型号取值后，4090 顶到 x=141，
+   * 原来写死的 124/126/130 全都落进卡体里。 */
+  const cardTop = gpus.length ? Math.max(...gpus.map(p => p[0])) : 124;  // pa[0] = 卡顶 + 4
+  const riser0 = Math.max(126, cardTop + 6);       // 显卡供电竖井（卡外侧）
+  /* 短卡（前缘 z>120）时 z=126 这条前侧通道是空的，走 x≈26 最贴边；
+     长卡把通道占满，三条竖井只能依次排到卡外侧：GPU / 24pin / EPS。 */
+  const longCard = gpusFront != null && gpusFront < 120;
+  const CX = longCard ? riser0 + 26 : 26;          // 24pin 竖井
+  const EX = longCard ? riser0 + 38 : CX + 4;      // EPS 竖井（与 24pin 错开 12mm）
   const R = [];
   // 24pin：竖井 → 贴主板前沿 → 插进插座（插座 z 196…220、y 237…282）
-  const t24 = CX > 60
+  const t24 = longCard
     ? [[CX - 20, 257, 158], [60, 259, 186], [8, 260, 204]]
     : [[14, 257, 160], [8, 260, 204]];
   R.push({
@@ -843,22 +1037,22 @@ function planCables(ctx) {
   /* EPS（CPU 供电）：竖井上来后贴着主板顶沿内侧（y=424）往尾部走 ——
    * 这条高度正好在 VRM 散热片（y≤415）上方、一体水冷冷排（y≥432）下方，
    * 也在风冷塔体（x≥14）的**左侧**，所以水冷/风冷两套配置都不会撞。
-   * 长显卡时竖井在 x=130，会穿过顶部风扇（x 45…165、y 342…462），
+   * 长卡时竖井在卡外侧，会穿过顶部风扇（x 45…165、y 342…462），
    * 所以先升到 y=250（卡上方）就横移到贴板位置，再从那里往上走。 */
   if (hasCpu) {
-    const headE = CX > 60
-      ? [[48, 62, PF], [46, 70, 180], [130, 74, 134], [130, 120, 126], [130, 250, 126],
-        [60, 264, 126], [14, 300, 126], [10, 390, 126], [10, 424, 126]]
-      : [[48, 62, PF], [46, 70, 180], [30, 74, 134], [30, 120, 126], [30, 424, 126],
+    const headE = longCard
+      ? [[48, 62, PF], [46, 70, 180], [EX, 74, 134], [EX, 120, 126], [EX, 250, 126],
+        [EX - 90, 264, 126], [14, 300, 126], [10, 390, 126], [10, 424, 126]]
+      : [[48, 62, PF], [46, 70, 180], [EX, 74, 134], [EX, 120, 126], [EX, 424, 126],
         [20, 424, 160], [10, 424, 230]];
     R.push({
       label: 'EPS', r: 4, color: 0x141821,
       pts: [...headE, [9, 424, 372], [9, 414, 396], [7, 406, 414]],
     });
   }
-  // 显卡供电：在卡外侧（x>116）升起 → 横着插进卡边缘的供电口
+  // 显卡供电：在卡外侧升起 → 横着插进卡边缘的供电口
   gpus.forEach((pa, i) => {
-    const xr = 124 + i * 12;
+    const xr = riser0 + i * 12;
     R.push({
       label: 'gpu', r: 4, color: 0x2a2418,
       pts: [[68 + i * 16, 70, PF], [96 + i * 16, 72, 176], [xr - 8, 74, 148],
@@ -1031,7 +1225,7 @@ function bindPointer() {
     }
     // hover
     raycaster.setFromCamera(ptr, camera);
-    const hit = raycaster.intersectObjects(pickables, true)[0];
+    const hit = pickThroughGlass();
     const root = hit ? rootPick(hit.object) : null;
     if (hoverObj && hoverObj !== root) setEmissiveBoost(hoverObj, false);
     hoverObj = root;
@@ -1046,7 +1240,7 @@ function bindPointer() {
   });
   el.addEventListener('pointerdown', e => {
     raycaster.setFromCamera(ptr, camera);
-    const hit = raycaster.intersectObjects(pickables, true)[0];
+    const hit = pickThroughGlass();
     const hitObj = hit ? hit.object : null;
     const obj = hitObj ? rootPick(hitObj) : null;
     down = {
@@ -1096,6 +1290,19 @@ function bindPointer() {
 function rootPick(o) { while (o) { if (o.userData && o.userData.pick) return o; o = o.parent; } return null; }
 /* 命中的网格是否属于玻璃侧盖（门组带 userData.isDoor 标记） */
 function isDoorNode(o) { while (o) { if (o.userData && o.userData.isDoor) return true; o = o.parent; } return false; }
+function isShroudGlassNode(o) { while (o) { if (o.userData && o.userData.isShroudGlass) return true; o = o.parent; } return false; }
+/* 电源仓观察窗是透明件。射线打上去不能停在玻璃上，否则永远只能选中整只机箱；
+   穿过玻璃后优先命中真实配件（电源），打到机箱内壁则当没点到。 */
+function pickThroughGlass() {
+  const hits = raycaster.intersectObjects(pickables, true);
+  if (!hits.length) return null;
+  if (!isShroudGlassNode(hits[0].object)) return hits[0];
+  for (let i = 1; i < hits.length; i++) {
+    const r = rootPick(hits[i].object);
+    if (r && r.userData.pick && r.userData.pick.cat !== 'case') return hits[i];
+  }
+  return null;
+}
 function setEmissiveBoost(root, on) {
   root.traverse(o => {
     if (o.isMesh && o.material && o.material.emissive !== undefined && !rgbs.some(r => r.mat === o.material)) {
