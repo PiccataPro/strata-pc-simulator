@@ -155,7 +155,8 @@ const VIEWS = {
 };
 const viewName = (process.argv.find(s => s.startsWith('--view=')) || '').split('=')[1] || 'default';
 const V = VIEWS[viewName] || VIEWS.default;
-const W = 960, H = 680;
+const argNum = (n, d) => { const m = process.argv.find(s => s.startsWith('--' + n + '=')); return m ? +m.split('=')[1] : d; };
+const W = argNum('w', 960), H = argNum('h', 680);   // 1200x630 = OG 社交卡片尺寸
 const cam = new THREE.PerspectiveCamera(42, W / H, 1, 6000);
 cam.position.set(...V.pos);
 cam.lookAt(new THREE.Vector3(...V.target));
@@ -167,8 +168,15 @@ const viewProj = new THREE.Matrix4().multiplyMatrices(cam.projectionMatrix, cam.
 const zbuf = new Float32Array(W * H).fill(Infinity);
 const img = new Uint8Array(W * H * 3);
 const owner = new Int16Array(W * H).fill(-1);
-const bg = [11, 15, 22];
-for (let i = 0; i < W * H; i++) { img[i * 3] = bg[0]; img[i * 3 + 1] = bg[1]; img[i * 3 + 2] = bg[2]; }
+/* 背景：从上到下的冷灰渐变，比纯色更像展台（OG 卡片用得上） */
+for (let y = 0; y < H; y++) {
+  const t = y / (H - 1);
+  const r = Math.round(23 - 12 * t), g2 = Math.round(30 - 15 * t), b = Math.round(40 - 20 * t);
+  for (let x = 0; x < W; x++) {
+    const i = (y * W + x) * 3;
+    img[i] = r; img[i + 1] = g2; img[i + 2] = b;
+  }
+}
 
 const L = new THREE.Vector3(600, 800, 500).normalize();   // 主光方向（与场景一致）
 const V3 = new THREE.Vector3();
@@ -185,10 +193,12 @@ for (const t of tris) {
   e1.subVectors(t.b, t.a); e2.subVectors(t.c, t.a);
   nrm.crossVectors(e1, e2).normalize();
   const diff = Math.max(0, nrm.dot(L));
-  /* 近似场景光照：半球天光（朝上的面更亮）+ 主光。真正的 PBR（金属反射、贴图）这里没有，
-     所以这版只能判断「几何关系」和「大体明暗」，不能判断材质细节。 */
+  /* 近似场景光照：半球天光（朝上的面更亮）+ 主光 + 金属环境项。
+     真 PBR 的金属没有漫反射、全靠 IBL 反射，这里没有环境贴图，
+     如果只做朗伯，深色机箱会塌成纯黑剪影——所以按 mat.metalness/roughness
+     推出的 t.lum 补一项“环境反射”，让金属件在预览里仍有明度层次。 */
   const sky = 0.40 + 0.38 * Math.max(0, nrm.y) - 0.06 * Math.min(0, nrm.y);
-  const shade = sky + 1.05 * diff;
+  const shade = sky + 1.05 * diff + 0.95 * (t.lum || 0);
 
   project(t.a, p0); project(t.b, p1); project(t.c, p2);
   if (p0.w <= 0 || p1.w <= 0 || p2.w <= 0) continue;                  // 近裁面

@@ -1,10 +1,22 @@
 # Strata PC Simulator · Strata 装机模拟器
 
-> A realistic PC-building simulator for **MoE local LLM inference**. Drag real parts into a case, press the power button, and watch decode speed / prefill / time-to-first-token / expert residency / thermals respond to both your hardware and your inference settings — calibrated against real measurements from the [Strata](https://github.com/Niko1221/Strata) MoE inference engine.
+**English** · [简体中文](README.zh-CN.md)
 
-A web-based, dependency-free simulator that answers the question every local-LLM builder eventually asks: **"which GPU / motherboard / RAM should I buy next, and what will it actually do to my tokens-per-second?"**
+[![Live demo](https://img.shields.io/badge/%E2%96%B6_live_demo-open_in_browser-3fb6ff?style=flat-square)](https://piccatapro.github.io/strata-pc-simulator/)
+[![License](https://img.shields.io/badge/license-MIT-3fd68f?style=flat-square)](LICENSE)
+[![Dependencies](https://img.shields.io/badge/runtime_deps-0-8b98ab?style=flat-square)](package.json)
+[![Checks](https://img.shields.io/badge/model_checks-36_passing-3fd68f?style=flat-square)](test.js)
 
-**[🎮 Live Demo (GitHub Pages)](https://piccatapro.github.io/strata-pc-simulator/)** · No install, just open and drag.
+**A 3D PC builder that predicts your local LLM tokens/sec.** Drag real parts into the case, press power, and watch decode throughput, prefill, time-to-first-token, expert residency, thermals and wall power respond to both your hardware *and* your inference settings — calibrated against real measurements from the [Strata](https://github.com/Niko1221/Strata) MoE inference engine.
+
+- **Buy the right part, not the bigger part.** A second GPU in a chipset `x4` slot can silently cap your whole system at `pcie_frac 0.25`.
+- **Every number traces back to a measurement.** Decode/prefill constants are solved analytically from two anchor machines, not curve-fitted — and `npm test` fails if they drift.
+- **Zero runtime dependencies.** Vanilla JS + Three.js, inlined into a single HTML file you can double-click offline.
+
+<!-- Hero GIF (10 s): drop the recording at docs/assets/demo.gif, then uncomment the next line. -->
+<!-- ![Strata PC Simulator — dragging a GPU into the case](docs/assets/demo.gif) -->
+
+**[🎮 Open the live demo](https://piccatapro.github.io/strata-pc-simulator/)** — no install, no build, just drag.
 
 ---
 
@@ -69,6 +81,8 @@ src/
   3d.js        Three.js scene (ES module, bundled at build time)
 scripts/serve.js   zero-dep dev server, rooted at repo root
 scripts/build.js   inlines everything → dist/ single file
+scripts/audit3d.js geometry audit: per-mesh AABB, out-of-bounds, real intersections, cable routing
+scripts/render3d.js software rasterizer (no WebGL) — renders the real geometry to PNG
 test.js            36-check verification suite (node test.js)
 docs/calibration.md  where every number comes from
 ```

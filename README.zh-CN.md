@@ -1,6 +1,22 @@
 # Strata 装机模拟器（中文说明）
 
-> 面向 **MoE 本地大模型推理** 的拟真装机模拟器。把真实配件拖进机箱、按下启动键，实时观察 decode 速度 / prefill / 首字延迟 / 专家驻留 / 温度功耗如何随你的硬件和推理设置变化——模型以 Strata MoE 推理引擎的真实实测数据校准。
+[English](README.md) · **简体中文**
+
+[![在线 Demo](https://img.shields.io/badge/%E2%96%B6_%E5%9C%A8%E7%BA%BF%E8%AF%95%E7%8E%A9-%E6%89%93%E5%BC%80%E5%8D%B3%E7%94%A8-3fb6ff?style=flat-square)](https://piccatapro.github.io/strata-pc-simulator/)
+[![License](https://img.shields.io/badge/license-MIT-3fd68f?style=flat-square)](LICENSE)
+[![依赖](https://img.shields.io/badge/%E8%BF%90%E8%A1%8C%E6%97%B6%E4%BE%9D%E8%B5%96-0-8b98ab?style=flat-square)](package.json)
+[![验算](https://img.shields.io/badge/%E6%A8%A1%E5%9E%8B%E9%AA%8C%E7%AE%97-36_%E9%A1%B9%E5%85%A8%E7%BB%BF-3fd68f?style=flat-square)](test.js)
+
+**装一台能跑本地大模型的机器，先看清楚它能跑多快。** 把真实配件拖进机箱、按下启动键，实时观察 decode 吞吐 / prefill / 首字延迟 / 专家驻留 / 温度功耗如何随硬件与推理参数变化——模型以 [Strata](https://github.com/Niko1221/Strata) MoE 推理引擎的真实实测数据校准。
+
+- **买对的那张卡，而不是更大的那张**：第二张卡插进芯片组 `x4` 槽，整机可能被 `pcie_frac 0.25` 悄悄锁死。
+- **每个数字都能追溯**：decode/prefill 常数由两台锚点机器解析求解，不是拟合出来的；`npm test` 会拦住漂移。
+- **零运行时依赖**：原生 JS + Three.js，可内联成单个 HTML，双击离线也能跑。
+
+<!-- 首屏 GIF（10 秒）：录好后放到 docs/assets/demo.gif，取消下一行注释即可 -->
+<!-- ![把显卡拖进机箱](docs/assets/demo.gif) -->
+
+**[🎮 打开在线 Demo](https://piccatapro.github.io/strata-pc-simulator/)** —— 不用装、不用编译，拖就行。
 
 ## 为什么做这个
 
