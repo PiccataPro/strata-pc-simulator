@@ -124,13 +124,13 @@ footer{display:flex;align-items:center;gap:16px;padding:12px 16px;background:var
   <div class="shelf" id="shelfL"></div>
   <div id="center">
     <div id="caseWrap">
+      <div id="viewBar">
+        <button id="btnDoor" style="display:none">🚪 开/关侧盖</button>
+        <button id="btnReset" style="display:none">🎯 复位视角</button>
+        <button id="btnView">⇄ 切到 3D</button>
+      </div>
       <svg id="caseSVG" viewBox="0 0 760 560"></svg>
       <div id="case3d">
-        <div id="viewBar">
-          <button id="btnDoor" style="display:none">🚪 开/关侧盖</button>
-          <button id="btnReset" style="display:none">🎯 复位视角</button>
-          <button id="btnView">⇄ 切到 3D</button>
-        </div>
         <div id="hint3d">拖拽旋转视角・滚轮缩放・双击开合玻璃侧盖・点击配件拆除（或拖出机箱外）</div>
       </div>
     </div>
