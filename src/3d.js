@@ -312,10 +312,23 @@ const glbStats = { tried: 0, ok: 0, fail: 0 };
 function loadGLB(url) {
   if (glbCache.has(url)) return glbCache.get(url);
   glbStats.tried++;
-  const p = new Promise(res => gltfLoader.load(url,
-    g => { glbStats.ok++; res(g.scene); },
-    undefined,
-    () => { glbStats.fail++; res(null); })); // 404/解析失败 → null → 程序化回退
+  /* 同一份资源在两种站点根下路径不同：
+   *   本地开发服务器 → ../assets/models/x.glb
+   *   GitHub Pages（docs/ 即站点根）→ assets/models/x.glb
+   * 主路径失败后自动把前缀换掉再试一次，避免"线上少一层模型"。 */
+  const alt = url.startsWith('../') ? url.slice(3) : url;
+  const p = new Promise(res => {
+    gltfLoader.load(url,
+      g => { glbStats.ok++; res(g.scene); },
+      undefined,
+      () => {
+        if (alt === url) { glbStats.fail++; res(null); return; }
+        gltfLoader.load(alt,
+          g => { glbStats.ok++; res(g.scene); },
+          undefined,
+          () => { glbStats.fail++; res(null); });   // 两条都失败 → 程序化回退
+      });
+  });
   glbCache.set(url, p);
   return p;
 }
@@ -897,8 +910,12 @@ function buildBench() {
   return top;
 }
 function loadBackdrop() {
+  /* 台面是几何体，和背景照片是两件事：照片没加载到也不该让机箱浮在半空。
+     以前 buildBench() 写在 loader 的成功回调里，Pages 上图片路径不匹配时
+     桌子、接触阴影、泛光/环境参数会一起丢掉——线上"背景和桌子都不见了"就是这个。 */
+  buildBench();
   if (/[?&]nobg/.test(location.search)) return;
-  new THREE.TextureLoader().load('../assets/bg/store.png', tex => {
+  const apply = tex => {
     tex.colorSpace = THREE.SRGBColorSpace;
     backdropTex = tex;
     backdrop = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({
@@ -912,9 +929,16 @@ function loadBackdrop() {
        阈值原来设 1.05，结果被灯光打亮的木台面也会越线，整屏糊成一片白。 */
     if (bloom) { bloom.threshold = 1.35; bloom.strength = 0.3; }
     scene.environmentIntensity = 0.75;
-    /* 真正的台面：机箱落在它上面，阴影是算出来的，不是画上去的 */
-    buildBench();
-  }, undefined, () => { /* 没有背景图就用深色背景 */ });
+  };
+  /* 两条候选：本地从 /src 打开时是 ../assets；Pages 把 docs/ 当站点根，是 assets。
+     第一个 404 就自动换下一个，不用改构建产物里的字符串。 */
+  const cands = ['../assets/bg/store.png', 'assets/bg/store.png'];
+  let i = 0;
+  const next = () => {
+    if (i >= cands.length) return;        // 全失败 → 保持深色背景，但台面还在
+    new THREE.TextureLoader().load(cands[i++], apply, undefined, next);
+  };
+  next();
 }
 
 /* ---- 装配 diff ---- */
@@ -923,6 +947,7 @@ let build_ref = {}, analyze_ref = { pcie: [], gpuAssign: [] };
 
 function sync(build, a) {
   if (!ready) return;
+  hidePickPop();          // 装配变化后旧的确认框已经指向不存在的部件
   build_ref = build; analyze_ref = a;
   const want = new Map();
   if (build.case) want.set(keyOf('case', 0, build.case), { cat: 'case', idx: 0, id: build.case });
@@ -1239,6 +1264,7 @@ function bindPointer() {
     }
   });
   el.addEventListener('pointerdown', e => {
+    hidePickPop();                 // 在别处按下去 → 收起上一次的浮窗
     raycaster.setFromCamera(ptr, camera);
     const hit = pickThroughGlass();
     const hitObj = hit ? hit.object : null;
@@ -1274,8 +1300,15 @@ function bindPointer() {
         toggleDoor();                       // 玻璃侧盖：单击开合
       } else if (removeCb) {
         const p = down.obj.userData.pick;
-        const nm = P.byId(p.id) ? P.byId(p.id).name : p.cat;
-        if (confirm('从机箱移除 ' + nm + '？')) removeCb(p.cat, p.idx);
+        const nm = P.byId(p.id) ? P.byId(p.id).name : (p.cat === 'case' ? '机箱' : p.cat);
+        const target = down.obj;
+        showPickPop({
+          obj: target, danger: true, okLabel: '移除',
+          text: p.cat === 'case'
+            ? '移除整只 <b>' + esc(nm) + '</b>？'
+            : '从机箱移除 <b>' + esc(nm) + '</b>？',
+          onOk: () => removeCb(p.cat, p.idx),
+        });
       }
     }
     down = null; dragging = false;
@@ -1401,6 +1434,35 @@ function hideSpareTip() {
   hoverSpare = null;
   if (spareTipEl) spareTipEl.style.display = 'none';
 }
+/* ---- 就地操作浮窗 ----
+ * 替代原生 confirm/alert：浏览器弹的那个白色方块会跑到窗口最上方，
+ * 和「点哪拆哪」的空间关系完全断开。浮窗由 app.js 统一实现（2D/3D 共用），
+ * 这里只负责把物体包围盒中心投到**视口坐标**再交出去。
+ */
+function esc(s) {
+  return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+function anchorScreen(obj) {
+  const r = container.getBoundingClientRect();
+  if (!obj) return { x: r.left + r.width / 2, y: r.top + r.height * 0.55 };
+  obj.updateMatrixWorld(true);
+  const b = new THREE.Box3().setFromObject(obj);
+  const c = b.getCenter(new THREE.Vector3()).project(camera);
+  return {
+    x: r.left + (c.x * 0.5 + 0.5) * r.width,
+    y: r.top + (-c.y * 0.5 + 0.5) * r.height,
+    inBox: { left: r.left, top: r.top, width: r.width, height: r.height },
+  };
+}
+function showPickPop(opt) {
+  const a = anchorScreen(opt.obj);
+  window.showUiPop({ x: a.x, y: a.y - 10, bound: a.inBox, text: opt.text, okLabel: opt.okLabel, danger: opt.danger, cancel: opt.cancel, onOk: opt.onOk });
+}
+function hidePickPop() { if (window.hideUiPop) window.hideUiPop(); }
+function toast3d(text) {
+  const a = anchorScreen(null);
+  window.showUiPop({ x: a.x, y: a.y, text, okLabel: '知道了', cancel: false });
+}
 /* 光标下的备用件 uid（pointerdown / pointermove 共用） */
 function spareHitUid() {
   if (!sparePickList.length) return null;
@@ -1460,6 +1522,7 @@ function setSpares(list) {
 }
 
 window.STRATA_3D = { init, sync, setPhase, setTelemetry, toggleDoor, resetView, setSpares,
+  toast: toast3d, hidePickPop,
   onRemove: cb => removeCb = cb,
   onSpareDelete: cb => spareDelCb = cb,
   onSpareInstall: cb => spareInstallCb = cb,

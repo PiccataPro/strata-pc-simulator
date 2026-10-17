@@ -122,3 +122,24 @@ console.log('OK →', path.relative(root, out), (fs.statSync(out).size / 1024).t
 const pagesEntry = path.join(root, 'docs', 'index.html');
 fs.writeFileSync(pagesEntry, html, 'utf8');
 console.log('OK →', path.relative(root, pagesEntry), '（GitHub Pages 入口）');
+
+/* Pages 把 docs/ 当站点根，外部资源不会跟着单文件走，必须一起搬过去。
+ * 漏掉 bg/store.png 的表现就是线上"背景和桌子都不见了"（台面已解耦，但照片会缺）。 */
+const docsDir = path.join(root, 'docs');
+const copies = [['assets/bg/store.png', 'assets/bg/store.png']];
+const manifestTxt = fs.readFileSync(path.join(root, 'assets', 'manifest.js'), 'utf8');
+/* 只搬 manifest 里真正登记过的 GLB（noGlb 的条目不会引用文件，不用占用 Pages 体积）。
+ * 同一文件可能被多个配件 id 引用（cpu_lga1700.glb 就被两颗 U 共用），用 Set 去重。 */
+const glbSet = new Set();
+for (const m of manifestTxt.matchAll(/glb:\s*'([^']+)'/g)) glbSet.add(m[1]);
+for (const g of glbSet) copies.push(['assets/models/' + g, 'assets/models/' + g]);
+let copiedKB = 0;
+for (const [from, to] of copies) {
+  const src2 = path.join(root, from);
+  if (!fs.existsSync(src2)) { console.warn('WARN: 缺少资源', from); continue; }
+  const dst = path.join(docsDir, to);
+  fs.mkdirSync(path.dirname(dst), { recursive: true });
+  fs.copyFileSync(src2, dst);
+  copiedKB += fs.statSync(dst).size / 1024;
+}
+console.log('OK → docs 外部资源 ' + copies.length + ' 个，共 ' + (copiedKB / 1024).toFixed(1) + ' MB（背景图 + 已登记 GLB）');

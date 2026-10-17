@@ -121,6 +121,23 @@ footer{display:flex;align-items:center;gap:16px;padding:12px 16px;background:var
 .spareTip .sp em{font-style:normal;color:var(--acc);opacity:.9}
 .spareTip .x{width:20px;height:20px;line-height:1;border-radius:5px;border:1px solid #3a2a2e;background:#2a1216;color:var(--err);font-size:14px;cursor:pointer;padding:0}
 .spareTip .x:hover{background:var(--err);color:#fff}
+/* 就地操作浮窗：贴在配件旁边的确认框（替代原生 confirm 的白方块）
+   2D SVG 和 3D 画布共用，坐标是视口坐标，所以用 position:fixed。 */
+#uiPop{position:fixed;display:none;transform:translate(-50%,-100%);z-index:60;min-width:172px;max-width:270px;
+  background:#131b28f5;border:1px solid #2c3a4e;border-radius:10px;padding:10px 11px 9px;
+  box-shadow:0 14px 34px #000a;backdrop-filter:blur(6px);font-size:12px;color:var(--txt);pointer-events:auto}
+#uiPop::after{content:"";position:absolute;left:50%;bottom:-5px;width:9px;height:9px;transform:translateX(-50%) rotate(45deg);
+  background:#131b28;border-right:1px solid #2c3a4e;border-bottom:1px solid #2c3a4e}
+#uiPop .tx{line-height:1.6;word-break:break-word}
+#uiPop .tx b{color:#ffe1a8;font-weight:600}
+#uiPop .row{display:flex;gap:6px;margin-top:9px}
+#uiPop .row.col{flex-direction:column}
+#uiPop button{flex:1;padding:5px 8px;border-radius:7px;font-size:11.5px;cursor:pointer;border:1px solid var(--line);background:var(--panel2);color:var(--txt)}
+#uiPop button:hover{border-color:#4b5f7a;color:#fff}
+#uiPop button.ok{border-color:#2f6fa8;background:#122a3f;color:#bfe3ff}
+#uiPop button.ok:hover{background:#17436a}
+#uiPop button.ok.danger{border-color:#7a2a33;background:#3a1418;color:#ff9aa5}
+#uiPop button.ok.danger:hover{background:var(--err);border-color:var(--err);color:#fff}
 /* 跑分浮层 */
 #benchOv{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:#05080cd0;backdrop-filter:blur(2px);z-index:8}
 #benchOv .card{width:min(430px,88%);background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px;box-shadow:0 18px 50px #0009}

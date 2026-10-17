@@ -34,7 +34,75 @@ function totalPrice() {
   return s;
 }
 
-/* ---- 货架 ---- */
+/* ---- 就地浮窗（2D / 3D 共用） ----
+ * 原生 confirm 会弹在窗口最上方，和「点哪个拆哪个」没有空间关系。
+ * 这里统一成一个贴在目标旁边的深色小卡片，坐标用视口坐标（position:fixed）。
+ * opt: { x, y, text(HTML), okLabel, danger, cancel=true, onOk, bound:{left,top,width,height} }
+ */
+let uiPopEl = null, uiPopOk = null;
+window.hideUiPop = function () {
+  uiPopOk = null;
+  if (uiPopEl) uiPopEl.style.display = 'none';
+};
+window.showUiPop = function (opt) {
+  if (!uiPopEl) {
+    const d = document.createElement('div');
+    d.id = 'uiPop';
+    d.innerHTML = '<div class="tx"></div><div class="row"></div>';
+    d.addEventListener('pointerdown', e => e.stopPropagation());
+    d.addEventListener('click', e => e.stopPropagation());
+    document.body.appendChild(d);
+    uiPopEl = d;
+  }
+  const d = uiPopEl;
+  d.querySelector('.tx').innerHTML = opt.text;
+  /* 按钮区每次重建：确认框是两个按钮（确定/取消），选择框是一列选项 */
+  const row = d.querySelector('.row');
+  row.innerHTML = '';
+  row.className = 'row' + (opt.choices ? ' col' : '');
+  uiPopOk = null;
+  if (opt.choices) {
+    opt.choices.forEach(c => {
+      const b = document.createElement('button');
+      b.className = 'ok'; b.textContent = c.label;
+      b.addEventListener('click', ev => { ev.stopPropagation(); window.hideUiPop(); c.onPick(); });
+      row.appendChild(b);
+    });
+  } else {
+    const okB = document.createElement('button');
+    okB.className = 'ok' + (opt.danger ? ' danger' : '');
+    okB.textContent = opt.okLabel || '确定';
+    okB.addEventListener('click', () => { const cb = uiPopOk; window.hideUiPop(); if (cb) cb(); });
+    row.appendChild(okB);
+    if (opt.cancel !== false) {
+      const noB = document.createElement('button');
+      noB.textContent = '取消';
+      noB.addEventListener('click', () => window.hideUiPop());
+      row.appendChild(noB);
+    }
+    uiPopOk = opt.onOk || null;
+  }
+  d.style.display = 'block';
+  /* 先显示再量尺寸，才能把浮窗完整钳进画面（贴边的配件不会把框顶出视野） */
+  const w = d.offsetWidth || 200, h = d.offsetHeight || 70;
+  const b = opt.bound || { left: 0, top: 0, width: innerWidth, height: innerHeight };
+  const minX = b.left + w / 2 + 8, maxX = b.left + b.width - w / 2 - 8;
+  const minY = b.top + h + 14, maxY = b.top + b.height - 10;
+  const x = Math.max(minX, Math.min(Math.max(minX, maxX), opt.x));
+  const y = Math.max(minY, Math.min(Math.max(minY, maxY), opt.y));
+  d.style.left = x + 'px';
+  d.style.top = y + 'px';
+};
+/* 以某个 DOM 元素的屏幕矩形为锚 */
+window.uiPopAt = function (el, opt) {
+  const r = el.getBoundingClientRect();
+  window.showUiPop(Object.assign({ x: r.left + r.width / 2, y: r.top + r.height * 0.4 }, opt));
+};
+/* 点到别处就收起。用捕获阶段的 pointerdown：它一定早于触发浮窗的那次 click，
+   所以"打开浮窗的那一下"不会把自己关掉。 */
+document.addEventListener('pointerdown', e => {
+  if (uiPopEl && uiPopEl.style.display !== 'none' && !uiPopEl.contains(e.target)) window.hideUiPop();
+}, true);
 const MULTI = { ram: 4, gpu: 2, ssd: 4 }; // 可重复装配的品类及上限
 function renderShelves() {
   /* 单件制品类：装了就置灰；多件制（内存/显卡/SSD）：显示已装×N，到上限才置灰 */
@@ -123,7 +191,9 @@ window.installSpare = uid => {
   if (!s) return;
   if (!install(s.id, s.cat, null, uid)) {
     const nm = (P.byId(s.id) || {}).name || s.cat;
-    alert('装不回去了：' + nm + ' 对应的插槽已满（显卡最多 2 张 / 固态最多 4 块 / 内存槽已插满）');
+    const msg = '装不回去：' + nm + ' 对应的插槽已满（显卡 2 张 / 固态 4 块 / 内存槽已插满）';
+    if (window.STRATA_3D && window.STRATA_3D.toast) window.STRATA_3D.toast(msg);
+    else alert(msg);
   }
 };
 function removePart(cat, idx) {
@@ -275,8 +345,11 @@ function renderCase(a) {
     el.addEventListener('click', ev => {
       ev.stopPropagation();
       const nm = (el.querySelector('text') ? el.querySelector('text').textContent : '') || CATNAME[el.dataset.cat];
-      if (!confirm('从机箱移除 ' + nm + '？')) return;
-      removePart(el.dataset.cat, el.dataset.idx != null ? +el.dataset.idx : undefined);
+      window.uiPopAt(el, {
+        danger: true, okLabel: '移除',
+        text: (el.dataset.cat === 'case' ? '移除整只 <b>' : '从机箱移除 <b>') + nm + '</b>？',
+        onOk: () => removePart(el.dataset.cat, el.dataset.idx != null ? +el.dataset.idx : undefined),
+      });
     });
     el.addEventListener('dragstart', ev => {
       ev.stopPropagation(); // 防止冒泡到主板导致主板被一并拆除
@@ -299,11 +372,17 @@ function renderCase(a) {
     el.addEventListener('click', ev => {
       ev.stopPropagation();
       const types = [...new Set([].concat(build.ram, []).filter(Boolean))];
-      if (!types.length) { alert('先把一条内存拖到任意槽，再点其它空槽即可复制插入'); return; }
-      const nm = types.map((t, i) => (i + 1) + '. ' + P.byId(t).name).join('\n');
-      const pick = prompt('插入到槽 ' + slotName[+el.dataset.slot] + '，选择序号：\n' + nm, '1');
-      if (pick == null) return;
-      const t = types[(+pick || 1) - 1]; if (t) install(t, 'ram', +el.dataset.slot);
+      if (!types.length) {
+        window.uiPopAt(el, { text: '先把一条内存拖到任意槽，再点其它空槽即可复制插入', okLabel: '知道了', cancel: false });
+        return;
+      }
+      window.uiPopAt(el, {
+        text: '插入到槽 <b>' + (slotName[+el.dataset.slot] || el.dataset.slot) + '</b>',
+        choices: types.map(t => ({
+          label: P.byId(t).name,
+          onPick: () => install(t, 'ram', +el.dataset.slot),
+        })),
+      });
     });
   });
 }
