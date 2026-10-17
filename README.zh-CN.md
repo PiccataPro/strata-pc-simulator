@@ -13,8 +13,7 @@
 - **每个数字都能追溯**：decode/prefill 常数由两台锚点机器解析求解，不是拟合出来的；`npm test` 会拦住漂移。
 - **零运行时依赖**：原生 JS + Three.js，可内联成单个 HTML，双击离线也能跑。
 
-<!-- 首屏 GIF（10 秒）：录好后放到 docs/assets/demo.gif，取消下一行注释即可 -->
-<!-- ![把显卡拖进机箱](docs/assets/demo.gif) -->
+![开机、风扇起转、拉开玻璃侧盖](docs/assets/demo.gif)
 
 **[🎮 打开在线 Demo](https://piccatapro.github.io/strata-pc-simulator/)** —— 不用装、不用编译，拖就行。
 
@@ -23,6 +22,8 @@
 在家用机上跑 100B+ MoE（Qwen Flash-Next 级别）是一道硬件均衡题：专家权重在显存 → 内存 → NVMe 三级之间流式调度，瓶颈往往不在你预期的地方。第二张卡插错 PCIe 槽会悄悄跑到 `pcie_frac 0.18` 拖垮整机；小显存卡会锁死 prompt chunk；AM5 上四条内存会静默降频到 3600。
 
 本模拟器把这些规则写成显式的兼容性矩阵 + 用实测锚点标定的时间模型——花钱之前先在屏幕上把升级试一遍。
+
+📝 **[为什么你的双卡只跑出单卡速度 →](docs/blog/2026-10-why-dual-gpu-slower.md)** —— 芯片组 x4 的坑，附实测数字。
 
 ## 功能
 

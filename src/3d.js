@@ -1343,6 +1343,9 @@ function pickThroughGlass() {
   return null;
 }
 function setEmissiveBoost(root, on) {
+  /* 机箱是结构性外壳，一悬停就把整台机箱点成蓝色（占用视野一大半），
+     而且它本来就不是"点一下拆一个"的配件——所以整只机箱不做高亮。 */
+  if (root && root.userData && root.userData.pick && root.userData.pick.cat === 'case') return;
   root.traverse(o => {
     if (o.isMesh && o.material && o.material.emissive !== undefined && !rgbs.some(r => r.mat === o.material)) {
       if (on) {
@@ -1536,4 +1539,7 @@ window.STRATA_3D = { init, sync, setPhase, setTelemetry, toggleDoor, resetView, 
   debugState: () => ({
     installed: [...installed.values()].map(v => ({ cat: v.cat, idx: v.idx, id: v.id, glb: !!(v.group.userData && v.group.userData.glbWrapped) })),
     glb: glbStats, phase, ready,
+    camera: ready ? camera.position.toArray().map(v => Math.round(v)) : null,
+    target: ready ? controls.target.toArray().map(v => Math.round(v)) : null,
+    canvas: renderer ? [renderer.domElement.width, renderer.domElement.height] : null,
   }) };

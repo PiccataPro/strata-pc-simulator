@@ -13,8 +13,7 @@
 - **Every number traces back to a measurement.** Decode/prefill constants are solved analytically from two anchor machines, not curve-fitted — and `npm test` fails if they drift.
 - **Zero runtime dependencies.** Vanilla JS + Three.js, inlined into a single HTML file you can double-click offline.
 
-<!-- Hero GIF (10 s): drop the recording at docs/assets/demo.gif, then uncomment the next line. -->
-<!-- ![Strata PC Simulator — dragging a GPU into the case](docs/assets/demo.gif) -->
+![Strata PC Simulator — boot the machine and pull the side panel open](docs/assets/demo.gif)
 
 **[🎮 Open the live demo](https://piccatapro.github.io/strata-pc-simulator/)** — no install, no build, just drag.
 
@@ -25,6 +24,8 @@
 Running a 100B+ MoE model (Qwen Flash-Next class) on a home PC is a hardware-balancing puzzle: expert weights stream across three tiers (VRAM → system RAM → NVMe), and the bottleneck is rarely where you expect it. A second GPU plugged into the wrong PCIe slot can run at `pcie_frac 0.18` and silently cap your whole system. Small-VRAM cards lock prompt chunks. Four DIMMs silently downclock on AM5.
 
 This simulator encodes those rules as an explicit compatibility matrix and a time-model calibrated to real benchmarks — so you can try the upgrade on screen before spending money.
+
+📝 **[Why your second GPU can make inference slower →](docs/blog/2026-10-why-dual-gpu-slower.en.md)** — the chipset `x4` trap, with numbers.
 
 ## Features
 
