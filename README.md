@@ -9,7 +9,11 @@
 
 > **Unofficial community tool.** Not affiliated with the [Strata](https://github.com/Niko1221/Strata) project — this is a simulator *for* Strata, calibrated against its published measurements and community benchmark reports.
 
-**A 3D PC builder that predicts your local LLM tokens/sec.** Drag real parts into the case, press power, and watch decode throughput, prefill, time-to-first-token, expert residency, thermals and wall power respond to both your hardware *and* your inference settings — calibrated against real measurements from the [Strata](https://github.com/Niko1221/Strata) MoE inference engine.
+**A 3D PC builder that predicts your local LLM tokens/sec.**
+
+Available in **English and 简体中文** — switch with the `中文 / EN` toggle in the header, or open the demo with `?lang=en`.
+
+ Drag real parts into the case, press power, and watch decode throughput, prefill, time-to-first-token, expert residency, thermals and wall power respond to both your hardware *and* your inference settings — calibrated against real measurements from the [Strata](https://github.com/Niko1221/Strata) MoE inference engine.
 
 - **Buy the right part, not the bigger part.** A second GPU in a chipset `x4` slot can silently cap your whole system at `pcie_frac 0.25`.
 - **Every number traces back to a measurement.** Decode/prefill constants are solved analytically from two anchor machines, not curve-fitted — and `npm test` fails if they drift.

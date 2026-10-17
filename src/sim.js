@@ -19,6 +19,7 @@
   else root.STRATA_SIM = factory(root.STRATA_PARTS);
 })(typeof self !== 'undefined' ? self : this, function (P) {
   'use strict';
+  const L = (zh, en) => (typeof window !== 'undefined' && window.L) ? window.L(zh, en) : zh;
 
   const ARCH_F = { turing: 0.75, ampere: 1.0, ada: 1.05, blackwell: 1.15 };
   const SIMD_F = { '512': 1.05, vnni: 1.12, avx2: 1.0 };
@@ -64,7 +65,8 @@
     const ramExperts = Math.min(pool - vramExperts, ramAvail);
     const diskExperts = pool - vramExperts - ramExperts;
     const fV = vramExperts / pool, fR = ramExperts / pool, fD = diskExperts / pool;
-    if (diskExperts > 0.5) out.warns.push('⚠ ' + diskExperts.toFixed(1) + 'G expert 溢出到盘（内存装不下 arena）——decode 跌到个位数');
+    if (diskExperts > 0.5) out.warns.push(L('⚠ ' + diskExperts.toFixed(1) + 'G expert 溢出到盘（内存装不下 arena）——decode 跌到个位数',
+      '⚠ ' + diskExperts.toFixed(1) + 'G of experts spill to disk (RAM cannot hold the arena) — decode drops to single digits'));
 
     /* 命中率（引擎口径）：VRAM驻留全命中，RAM驻留命中~0.8（路由尾跳过）——锚点A1: 0.36+0.64×0.8×0.917=0.83≈实测86.7% */
     const ctxDecay = Math.max(0, ctxK - 32) / 256 * 0.083 + Math.max(0, conc - 1) * 0.02;

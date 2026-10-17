@@ -74,6 +74,12 @@ header .tag{font-size:11px;color:var(--dim)}
 .part.cat-ssd{border-left:3px solid var(--ssd)} .part.cat-psu{border-left:3px solid var(--psu)}
 .part.cat-cooler{border-left:3px solid var(--cool)} .part.cat-case{border-left:3px solid #6b7a90}
 /* ---- 中间机箱 ---- */
+/* 语言切换：放在标题右侧，蓝底胶囊，一眼能找到 */
+#langSwitch{display:inline-flex;gap:2px;padding:3px;border-radius:9px;background:#0d141e;border:1px solid #2f6fa8;margin-left:14px;vertical-align:middle}
+#langSwitch button{border:0;background:transparent;color:#8fb4d4;font-size:12px;font-weight:600;letter-spacing:.5px;
+  padding:4px 11px;border-radius:7px;cursor:pointer;transition:background .15s,color .15s}
+#langSwitch button:hover{color:#cfe8ff}
+#langSwitch button.on{background:#3fb6ff;color:#04121f;box-shadow:0 0 12px #3fb6ff66}
 #center{display:flex;flex-direction:column;gap:8px}
 /* 2D 视图顶部那条醒目的 3D 入口。红→橙渐变 + 呼吸光晕，是全页视觉重心 */
 #cta3dBig{position:relative;display:flex;align-items:center;gap:16px;width:100%;padding:17px 22px;
@@ -212,21 +218,25 @@ footer{display:flex;align-items:center;gap:16px;padding:12px 16px;background:var
 </head>
 <body>
 <header>
-  <h1>⬢ STRATA 装机模拟器</h1>
-  <span class="tag">Qwen3.8-Flash-Next 125B MoE · 专家缓存分层仿真 · 数据锚定 2026-10 实测 · 非官方社区工具</span>
+  <h1 data-zh="⬢ STRATA 装机模拟器" data-en="⬢ STRATA PC Simulator">⬢ STRATA 装机模拟器</h1>
+  <div id="langSwitch" role="group" aria-label="Language / 语言">
+    <button type="button" data-lang="zh" class="on">中文</button>
+    <button type="button" data-lang="en">EN</button>
+  </div>
+  <span class="tag" data-zh="Qwen3.8-Flash-Next 125B MoE · 专家缓存分层仿真 · 数据锚定 2026-10 实测 · 非官方社区工具" data-en="Qwen3.8-Flash-Next 125B MoE · expert-cache tiering model · anchored to 2026-10 measurements · unofficial community tool">Qwen3.8-Flash-Next 125B MoE · 专家缓存分层仿真 · 数据锚定 2026-10 实测 · 非官方社区工具</span>
 </header>
 
 <div id="strataBar">
-  <label>权重档位<select id="sModel"></select></label>
-  <label>上下文长度 <span class="val" id="vCtx"></span><input type="range" id="sCtx" min="8" max="256" step="8" value="256"></label>
-  <label>并发路数 <span class="val" id="vConc"></span><input type="range" id="sConc" min="1" max="8" value="1"></label>
-  <label>思考强度<select id="sThink">
-    <option value="light">light（少思考快出）</option>
-    <option value="balanced" selected>balanced（均衡）</option>
-    <option value="deep">deep（深度思考）</option>
+  <label><span data-zh="权重档位" data-en="Model size">权重档位</span><select id="sModel"></select></label>
+  <label><span data-zh="上下文长度" data-en="Context">上下文长度</span> <span class="val" id="vCtx"></span><input type="range" id="sCtx" min="8" max="256" step="8" value="256"></label>
+  <label><span data-zh="并发路数" data-en="Streams">并发路数</span> <span class="val" id="vConc"></span><input type="range" id="sConc" min="1" max="8" value="1"></label>
+  <label><span data-zh="思考强度" data-en="Thinking">思考强度</span><select id="sThink">
+    <option value="light" data-zh="light（少思考快出）" data-en="light (fast)">light（少思考快出）</option>
+    <option value="balanced" selected data-zh="balanced（均衡）" data-en="balanced">balanced（均衡）</option>
+    <option value="deep" data-zh="deep（深度思考）" data-en="deep (slow, thorough)">deep（深度思考）</option>
   </select></label>
-  <label class="chk"><input type="checkbox" id="sIgpu">核显输出（独卡纯计算化）</label>
-  <label class="chk"><input type="checkbox" id="sHelper">helper-cache 模式</label>
+  <label class="chk"><input type="checkbox" id="sIgpu"><span data-zh="核显输出（独卡纯计算化）" data-en="iGPU display (GPU stays compute-only)">核显输出（独卡纯计算化）</span></label>
+  <label class="chk"><input type="checkbox" id="sHelper"><span data-zh="helper-cache 模式" data-en="helper-cache mode">helper-cache 模式</span></label>
   <span style="flex:1"></span>
   <span class="tag" id="priceTag"></span>
 </div>
@@ -236,24 +246,24 @@ footer{display:flex;align-items:center;gap:16px;padding:12px 16px;background:var
   <div id="center">
     <button id="cta3dBig" type="button">
       <span class="ic">⬢</span>
-      <span class="tx"><b>进入 3D 实景装机台</b><i>真机开箱 · 玻璃侧透 · 点哪拆哪 · 开机跑分</i></span>
-      <span class="go">开始装机 →</span>
+      <span class="tx"><b data-zh="进入 3D 实景装机台" data-en="Open the 3D build bench">进入 3D 实景装机台</b><i data-zh="真机开箱 · 玻璃侧透 · 点哪拆哪 · 开机跑分" data-en="Real hardware · glass side panel · click to remove · boot &amp; bench">真机开箱 · 玻璃侧透 · 点哪拆哪 · 开机跑分</i></span>
+      <span class="go" data-zh="开始装机 →" data-en="Start building →">开始装机 →</span>
     </button>
     <div id="caseWrap">
       <div id="viewBar">
-        <button id="btnDoor" style="display:none">🚪 开/关侧盖</button>
-        <button id="btnReset" style="display:none">🎯 复位视角</button>
-        <button id="btnView">⇄ 切到 3D</button>
+        <button id="btnDoor" style="display:none" data-zh="🚪 开/关侧盖" data-en="🚪 Side panel">🚪 开/关侧盖</button>
+        <button id="btnReset" style="display:none" data-zh="🎯 复位视角" data-en="🎯 Reset view">🎯 复位视角</button>
+        <button id="btnView" data-zh="⇄ 切到 3D" data-en="⇄ 3D view">⇄ 切到 3D</button>
       </div>
       <svg id="caseSVG" viewBox="0 0 760 560"></svg>
       <div id="case3d">
-        <div id="hint3d">拖动旋转视角・滚轮缩放・点玻璃开合侧盖・点配件移除・拖出机箱外也拆・点台面上的零件装回・开盖后透过电源仓玻璃窗可直接选中电源</div>
+        <div id="hint3d" data-zh="拖动旋转视角・滚轮缩放・点玻璃开合侧盖・点配件移除・拖出机箱外也拆・点台面上的零件装回・开盖后透过电源仓玻璃窗可直接选中电源" data-en="Drag to orbit · scroll to zoom · click the glass to open the side panel · click a part to remove · drag it out of the case to remove · click a spare on the bench to reinstall · with the panel open you can click the PSU through the shroud window">拖动旋转视角・滚轮缩放・点玻璃开合侧盖・点配件移除・拖出机箱外也拆・点台面上的零件装回・开盖后透过电源仓玻璃窗可直接选中电源</div>
         <div id="benchOv">
           <div class="card">
-            <div class="ttl">StrataBench 跑分</div>
+            <div class="ttl" data-zh="StrataBench 跑分" data-en="StrataBench">StrataBench 跑分</div>
             <div class="bar"><i></i></div>
             <div class="res"></div>
-            <button id="benchClose">关闭</button>
+            <button id="benchClose" data-zh="关闭" data-en="Close">关闭</button>
           </div>
         </div>
       </div>
@@ -265,20 +275,21 @@ footer{display:flex;align-items:center;gap:16px;padding:12px 16px;background:var
   <div id="railR">
     <button id="cta3d" type="button">
       <span class="ic">⬢</span>
-      <span class="t">进入 3D 实景装机台</span>
-      <span class="s">真机模型 · 玻璃侧透 · 可拆可装</span>
+      <span class="t" data-zh="进入 3D 实景装机台" data-en="Open 3D bench">进入 3D 实景装机台</span>
+      <span class="s" data-zh="真机模型 · 玻璃侧透 · 可拆可装" data-en="Real parts · glass panel · take apart">真机模型 · 玻璃侧透 · 可拆可装</span>
     </button>
     <div class="shelf" id="shelfR"></div>
   </div>
 </div>
 
 <footer>
-  <button id="bootBtn" disabled>启动</button>
-  <button id="benchBtn" disabled>跑分</button>
-  <div id="bootLog">把配件拖进机箱 → 基本件齐全（CPU/主板/内存/散热/电源/SSD/机箱 + 显示输出）才能点亮。<br>配件从机箱拖出即拆除。机箱内点击配件也可退回货架。</div>
-  <div id="hint">💡 拖拽装配。注意：主板第二槽的电气规格（CPU直连x8 vs 芯片组x4）决定 Strata 副卡 pcie_frac——4070S 的教训会在这里重演。</div>
+  <button id="bootBtn" disabled data-zh="启动" data-en="Power on">启动</button>
+  <button id="benchBtn" disabled data-zh="跑分" data-en="Benchmark">跑分</button>
+  <div id="bootLog" data-html data-zh="把配件拖进机箱 → 基本件齐全（CPU/主板/内存/散热/电源/SSD/机箱 + 显示输出）才能点亮。<br>配件从机箱拖出即拆除。机箱内点击配件也可退回货架。" data-en="Drag parts into the case → it only POSTs with CPU / motherboard / RAM / cooler / PSU / storage / case plus a display output.<br>Drag a part out of the case to remove it; clicking a part inside the case also sends it back to the shelf.">把配件拖进机箱 → 基本件齐全（CPU/主板/内存/散热/电源/SSD/机箱 + 显示输出）才能点亮。<br>配件从机箱拖出即拆除。机箱内点击配件也可退回货架。</div>
+  <div id="hint" data-zh="💡 拖拽装配。注意：主板第二槽的电气规格（CPU直连x8 vs 芯片组x4）决定 Strata 副卡 pcie_frac——4070S 的教训会在这里重演。" data-en="💡 Drag to build. Note: the electrical spec of slot 2 (CPU-attached x8 vs chipset x4) sets the second card's pcie_frac in Strata — the 4070S lesson repeats here.">💡 拖拽装配。注意：主板第二槽的电气规格（CPU直连x8 vs 芯片组x4）决定 Strata 副卡 pcie_frac——4070S 的教训会在这里重演。</div>
 </footer>
 
+<script src="i18n.js"></script>
 <script src="parts.js"></script>
 <script src="sim.js"></script>
 <script src="app.js"></script>

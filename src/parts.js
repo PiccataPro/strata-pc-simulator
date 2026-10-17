@@ -14,6 +14,8 @@
   else root.STRATA_PARTS = factory();
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
+  /* 诊断文案双语：Node（test.js）里没有 window，自动回落中文，锚点断言不受影响 */
+  const L = (zh, en) => (typeof window !== 'undefined' && window.L) ? window.L(zh, en) : zh;
 
   const GBPS_PER_LANE = { 3: 0.985, 4: 1.969, 5: 3.94 }; // GB/s per PCIe lane（有效载荷）
 
@@ -183,16 +185,16 @@
     const derates = [];
     if (filled.length === 4) {
       const cap = cpu.socket === 'AM5' ? 3600 : (symmetric ? 4400 : 4000);
-      if (mt > cap) { derates.push(filled.length + '条' + (symmetric ? '' : '混插') + '降频→' + cap); mt = cap; }
+      if (mt > cap) { derates.push(filled.length + L('条',' sticks ') + (symmetric ? '' : L('混插','mixed ')) + L('降频→','downclocked to ') + cap); mt = cap; }
     } else if (filled.length === 3) {
-      mt = Math.min(mt, 4800); derates.push('3条非对称→' + mt);
+      mt = Math.min(mt, 4800); derates.push(L('3条非对称→','3 sticks, asymmetric → ') + mt);
     }
     /* 单通道插法提示：两条同组（如 A1+A2）→ 仍单通道 */
-    if (filled.length === 2 && activeCh === 1) derates.push('两条同通道（' + Object.keys(groups).find(k => groups[k].filter(Boolean).length === 2) + '组）→ 单通道，建议跨 A/B 组插');
-    if (!symmetric && dual) derates.push('通道容量不对称→弹性通道混合，带宽-15%');
+    if (filled.length === 2 && activeCh === 1) derates.push(L('两条同通道（','Both sticks in channel ') + Object.keys(groups).find(k => groups[k].filter(Boolean).length === 2) + L('组）→ 单通道，建议跨 A/B 组插',' → single channel; populate across groups A/B'));
+    if (!symmetric && dual) derates.push(L('通道容量不对称→弹性通道混合，带宽-15%','Channel capacities differ → flex mode, -15% bandwidth'));
     const bw = dual ? mt * 8 * activeCh / 1000 : mt * 8 / 1000; // 每通道64bit=mt×8 GB/s
     const bwEff = bw * (symmetric ? 1 : 0.85);
-    const chanLabel = activeCh >= 2 ? (symmetric ? activeCh + '通道' : '弹性' + (activeCh - 0.5) + '通道') : '单通道';
+    const chanLabel = activeCh >= 2 ? (symmetric ? activeCh + L('通道',' channels') : L('弹性','flex ') + (activeCh - 0.5) + L('通道',' channels')) : L('单通道','single channel');
     return { slots, chan, total: sizes.reduce((a, b) => a + b, 0), channels: dual ? (symmetric ? activeCh : activeCh - 0.5) : 1, chanLabel, mt, bw: bwEff, derates,
       symmetric, count: filled.length, warn: derates.length ? derates.join('；') : null };
   }
@@ -238,23 +240,23 @@
     const ssdList = (build.ssd || []).map(byId).filter(Boolean);
     const ram = mobo && cpu ? analyzeRAM(build, mobo, cpu) : null;
 
-    if (!cpu) errors.push('缺 CPU');
-    if (!mobo) errors.push('缺主板');
-    if (!ram || ram.error) errors.push(ram ? ram.error : '缺内存');
-    if (!psu) errors.push('缺电源');
-    if (!cooler) errors.push('缺 CPU 散热器（无散热器上电=秒缩缸保护关机）');
-    if (!ssdList.length) errors.push('无存储盘（权重在盘上，无法加载）');
-    if (!kase) errors.push('缺机箱');
+    if (!cpu) errors.push(L('缺 CPU','No CPU'));
+    if (!mobo) errors.push(L('缺主板','No motherboard'));
+    if (!ram || ram.error) errors.push(ram ? ram.error : L('缺内存','No memory'));
+    if (!psu) errors.push(L('缺电源','No PSU'));
+    if (!cooler) errors.push(L('缺 CPU 散热器（无散热器上电=秒缩缸保护关机）','No CPU cooler (powering on without one trips thermal shutdown)'));
+    if (!ssdList.length) errors.push(L('无存储盘（权重在盘上，无法加载）','No storage (weights live on disk — nothing to load)'));
+    if (!kase) errors.push(L('缺机箱','No case'));
 
-    if (cpu && mobo && cpu.socket !== mobo.socket) errors.push('插槽不匹配：' + cpu.name + '(' + cpu.socket + ') ≠ ' + mobo.name + '(' + mobo.socket + ')');
-    if (mobo && ram && ram.slots.filter(Boolean).length > mobo.memSlots) errors.push('内存条数超过主板槽数');
-    if (cpu && cooler && cooler.cap < (cpu.pl2||cpu.tdp)) warns.push('散热压不住：' + cooler.name + ' 解热 ' + cooler.cap + 'W < ' + cpu.name + ' PL2 ' + (cpu.pl2||cpu.tdp) + 'W（会撞温度墙降频）');
-    if (mobo && kase && ['ATX', 'E-ATX'].includes(mobo.form) && kase.formMax === 'ATX' && mobo.form === 'E-ATX') errors.push('E-ATX 主板装不进中塔');
+    if (cpu && mobo && cpu.socket !== mobo.socket) errors.push(L('插槽不匹配：','Socket mismatch: ') + cpu.name + '(' + cpu.socket + ') ≠ ' + mobo.name + '(' + mobo.socket + ')');
+    if (mobo && ram && ram.slots.filter(Boolean).length > mobo.memSlots) errors.push(L('内存条数超过主板槽数','More DIMMs than the board has slots'));
+    if (cpu && cooler && cooler.cap < (cpu.pl2||cpu.tdp)) warns.push(L('散热压不住：','Cooler too weak: ') + cooler.name + L(' 解热 ',' cools ') + cooler.cap + 'W < ' + cpu.name + ' PL2 ' + (cpu.pl2||cpu.tdp) + L('W（会撞温度墙降频）','W (it will throttle on the thermal wall)'));
+    if (mobo && kase && ['ATX', 'E-ATX'].includes(mobo.form) && kase.formMax === 'ATX' && mobo.form === 'E-ATX') errors.push(L('E-ATX 主板装不进中塔','An E-ATX board does not fit a mid tower'));
 
     /* 显示输出：无核显且无独卡 → 点不亮（POST 无显示） */
     const igpuUsable = cpu && cpu.igpu !== 'none';
     const igpuChosen = settings && settings.igpuDisplay && igpuUsable;
-    if (!gpuList.length && !igpuUsable) errors.push('无独卡且 ' + (cpu ? cpu.name : 'CPU') + ' 无核显——无显示输出点不亮（12700KF/KF 教训）');
+    if (!gpuList.length && !igpuUsable) errors.push(L('无独卡且 ','No GPU and ') + (cpu ? cpu.name : 'CPU') + L(' 无核显——无显示输出点不亮（12700KF/KF 教训）',' has no iGPU — no display output, so it will not POST (the 12700KF lesson)'));
 
     /* PCIe 分配 + 显卡物理/电气 */
     const pcie = mobo ? allocPCIe(mobo, gpuList.length, ssdList) : [];
@@ -264,20 +266,20 @@
       const slotPos = pcie.map(p => p.pos);
       for (const g of gpuList) {
         const si = slotPos.findIndex((p, idx) => idx >= nextFree && p >= 1);
-        if (si < 0) { errors.push(g.name + '：主板卡槽已满（' + mobo.name + ' 只有 ' + mobo.slots.length + ' 个可用槽）'); break; }
+        if (si < 0) { errors.push(g.name + L('：主板卡槽已满（',': no free slot left (') + mobo.name + L(' 只有 ',' has ') + mobo.slots.length + L(' 个可用槽）',' usable slots)')); break; }
         const slot = pcie[si];
         const prev = gpuAssign[gpuAssign.length - 1];
         if (prev) {
           const gap = slot.pos - prev.slotPos;
-          if (gap < prev.thick) errors.push(g.name + ' 装不进：与 ' + prev.name + ' 冲突（需 ' + prev.thick + ' 槽间距，实际 ' + gap + '）');
+          if (gap < prev.thick) errors.push(g.name + L(' 装不进：与 ',' cannot fit: clashes with ') + prev.name + L(' 冲突（需 ',' — needs ') + prev.thick + L(' 槽间距，实际 ',' slots of clearance, got ') + gap + ')');
         }
-        if (kase && g.len > kase.gpuMaxLen) errors.push(g.name + ' 长 ' + g.len + 'mm 超过机箱限长 ' + kase.gpuMaxLen + 'mm');
-        if (slot.src === 'chipset') warns.push(g.name + ' 在芯片组 x' + slot.lanes + '：' + slot.gbps + 'GB/s → Strata pcie_frac ' + slot.frac + '（4070S 教训，issue#448）');
-        else if (slot.lanes < 8) warns.push(g.name + ' 仅 x' + slot.lanes + '，pcie_frac ' + slot.frac);
+        if (kase && g.len > kase.gpuMaxLen) errors.push(g.name + L(' 长 ',' is ') + g.len + L('mm 超过机箱限长 ','mm — over the case limit of ') + kase.gpuMaxLen + 'mm');
+        if (slot.src === 'chipset') warns.push(g.name + L(' 在芯片组 x',' on the chipset x') + slot.lanes + ': ' + slot.gbps + 'GB/s → Strata pcie_frac ' + slot.frac + L('（4070S 教训，issue#448）',' (the 4070S lesson, issue #448)'));
+        else if (slot.lanes < 8) warns.push(g.name + L(' 仅 x',' runs x') + slot.lanes + L('，pcie_frac ',' only — pcie_frac ') + slot.frac);
         gpuAssign.push({ ...g, slotPos: slot.pos, slot, thick: g.thick });
         nextFree = si + 1;
       }
-      if (gpuList.length > mobo.slots.length) errors.push('显卡数量超过主板槽数');
+      if (gpuList.length > mobo.slots.length) errors.push(L('显卡数量超过主板槽数','More GPUs than the board has slots'));
     }
 
     /* 供电 */
@@ -287,21 +289,21 @@
     let powerOK = true;
     if (psu) {
       const need = load / 0.85;
-      if (psu.w < need) { errors.push('电源不足：峰值 ' + load + 'W，建议 ≥' + Math.ceil(need / 50) * 50 + 'W（85% 负载线），当前 ' + psu.name); powerOK = false; }
-      else if (psu.w < load / 0.7) warns.push('电源余量偏紧（负载 >' + Math.round(load / psu.w * 100) + '%）');
+      if (psu.w < need) { errors.push(L('电源不足：峰值 ','PSU too small: peak ') + load + L('W，建议 ≥','W, recommend ≥') + Math.ceil(need / 50) * 50 + L('W（85% 负载线），当前 ','W (85% load line); you have ') + psu.name); powerOK = false; }
+      else if (psu.w < load / 0.7) warns.push(L('电源余量偏紧（负载 >','PSU headroom is tight (>') + Math.round(load / psu.w * 100) + L('%）','% load)'));
       const need16 = gpuAssign.filter(g => /16pin|12pin/.test(g.conn)).length;
-      if (need16 > psu.conn16pin) warns.push('缺原生 16pin/12pin 接口：需 ' + need16 + ' 个，电源只有 ' + psu.conn16pin + ' 个（用转接线有熔毁风险）');
+      if (need16 > psu.conn16pin) warns.push(L('缺原生 16pin/12pin 接口：需 ','Not enough native 16-pin connectors: need ') + need16 + L(' 个，电源只有 ',' but the PSU has ') + psu.conn16pin + L(' 个（用转接线有熔毁风险）',' (adapters have melted before)'));
     }
 
     /* 内存带宽对 Strata CPU 侧 expert 的影响 */
     if (ram && !ram.error) {
-      if (ram.total < 64) warns.push('内存 ' + ram.total + 'G：125B expert arena 装不下（IQ3_S 需 ~72G 全驻），decode 会掉到个位数');
-      else if (ram.total < 96) warns.push('内存 ' + ram.total + 'G：expert arena 部分驻留，长上下文时 RAM 余量吃紧');
-      if (ram.bw < 70) warns.push('内存带宽 ' + Math.round(ram.bw) + 'GB/s 偏低——CPU 侧 expert 计算是带宽敏感负载（AM5 四槽降 3600 的典型代价）');
+      if (ram.total < 64) warns.push(L('内存 ','RAM ') + ram.total + L('G：125B expert arena 装不下（IQ3_S 需 ~72G 全驻），decode 会掉到个位数','G: the 125B expert arena does not fit (IQ3_S needs ~72G resident) — decode falls to single digits'));
+      else if (ram.total < 96) warns.push(L('内存 ','RAM ') + ram.total + L('G：expert arena 部分驻留，长上下文时 RAM 余量吃紧','G: the expert arena is partly resident — long contexts run out of RAM headroom'));
+      if (ram.bw < 70) warns.push(L('内存带宽 ','Memory bandwidth ') + Math.round(ram.bw) + L('GB/s 偏低——CPU 侧 expert 计算是带宽敏感负载（AM5 四槽降 3600 的典型代价）','GB/s is low — CPU-side expert compute is bandwidth-bound (the usual AM5 4-DIMM / 3600 cost)'));
     }
 
     /* 机械盘放权重警告 */
-    if (ssdList.length && ssdList.every(s => s.type === 'sata')) warns.push('权重全在机械盘（175MB/s）：expert 流式加载会卡死 decode，权重必须放 NVMe');
+    if (ssdList.length && ssdList.every(s => s.type === 'sata')) warns.push(L('权重全在机械盘（175MB/s）：expert 流式加载会卡死 decode，权重必须放 NVMe','Weights on a spinning disk (175MB/s): streamed experts stall decode — they must live on NVMe'));
 
     const canPost = errors.length === 0;
     return { cpu, mobo, psu, cooler, kase, ram, pcie, gpuAssign, ssdList, errors, warns, info, load, canPost, igpuChosen };

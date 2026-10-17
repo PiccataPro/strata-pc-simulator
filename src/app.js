@@ -6,9 +6,9 @@ const P = window.STRATA_PARTS, S = window.STRATA_SIM;
 const build = { cpu: null, mobo: null, ram: [], gpu: [], ssd: [], psu: null, cooler: null, case: null };
 let running = false, phase = 'idle'; // idle|cables|boot|run
 const CATS = [
-  { k: 'cpu', arr: 'cpus', t: 'CPU 处理器' }, { k: 'mobo', arr: 'mobos', t: '主板' }, { k: 'ram', arr: 'dimms', t: '内存条（拖多次=多槽）' },
-  { k: 'gpu', arr: 'gpus', t: '显卡（最多2张）' }, { k: 'ssd', arr: 'ssds', t: 'SSD / 存储' },
-  { k: 'psu', arr: 'psus', t: '电源' }, { k: 'cooler', arr: 'coolers', t: 'CPU 散热器' }, { k: 'case', arr: 'cases', t: '机箱' },
+  { k: 'cpu', arr: 'cpus', t: 'CPU 处理器', e: 'CPU' }, { k: 'mobo', arr: 'mobos', t: '主板', e: 'Motherboard' }, { k: 'ram', arr: 'dimms', t: '内存条（拖多次=多槽）', e: 'Memory (drag again = another slot)' },
+  { k: 'gpu', arr: 'gpus', t: '显卡（最多2张）', e: 'Graphics card (max 2)' }, { k: 'ssd', arr: 'ssds', t: 'SSD / 存储', e: 'Storage' },
+  { k: 'psu', arr: 'psus', t: '电源', e: 'Power supply' }, { k: 'cooler', arr: 'coolers', t: 'CPU 散热器', e: 'CPU cooler' }, { k: 'case', arr: 'cases', t: '机箱', e: 'Case' },
 ];
 
 function settings() {
@@ -71,12 +71,12 @@ window.showUiPop = function (opt) {
   } else {
     const okB = document.createElement('button');
     okB.className = 'ok' + (opt.danger ? ' danger' : '');
-    okB.textContent = opt.okLabel || '确定';
+    okB.textContent = opt.okLabel || L('确定','OK');
     okB.addEventListener('click', () => { const cb = uiPopOk; window.hideUiPop(); if (cb) cb(); });
     row.appendChild(okB);
     if (opt.cancel !== false) {
       const noB = document.createElement('button');
-      noB.textContent = '取消';
+      noB.textContent = L('取消','Cancel');
       noB.addEventListener('click', () => window.hideUiPop());
       row.appendChild(noB);
     }
@@ -113,22 +113,22 @@ function renderShelves() {
   [[document.getElementById('shelfL'), CATS.slice(0, half)], [document.getElementById('shelfR'), CATS.slice(half)]].forEach(([el, cats]) => {
     el.innerHTML = '';
     cats.forEach(c => {
-      const h = document.createElement('h3'); h.textContent = c.t; el.appendChild(h);
+      const h = document.createElement('h3'); h.textContent = L(c.t, c.e); el.appendChild(h);
       P[c.arr].forEach(p => {
         const n = cnt[p.id] || 0, lim = c.k === 'ram' ? ramSlotCount() : MULTI[c.k]; // 内存上限=当前主板槽数
         const d = document.createElement('div');
         d.className = 'part cat-' + c.k + ((inUse.has(p.id) || (lim && n >= lim)) ? ' inuse' : '');
         d.draggable = true; d.dataset.id = p.id; d.dataset.cat = c.k;
-        const sp = c.k === 'cpu' ? (p.p + 'P' + (p.e ? '+' + p.e + 'E' : '') + '/' + p.thr + 'T · ' + ({ '512': 'AVX-512', vnni: 'AVX-VNNI', avx2: 'AVX2' })[p.simd] + (p.igpu !== 'none' ? ' · 核显' : ' · 无核显'))
-          : c.k === 'mobo' ? (p.socket + ' · DDR' + p.ddr + ' · 槽:' + p.slots.map(s => 'x' + s.lanes + (s.src === 'cpu' ? 'CPU' : '芯')).join('+'))
+        const sp = c.k === 'cpu' ? (p.p + 'P' + (p.e ? '+' + p.e + 'E' : '') + '/' + p.thr + 'T · ' + ({ '512': 'AVX-512', vnni: 'AVX-VNNI', avx2: 'AVX2' })[p.simd] + (p.igpu !== 'none' ? L(' · 核显',' · iGPU') : L(' · 无核显',' · no iGPU')))
+          : c.k === 'mobo' ? (p.socket + ' · DDR' + p.ddr + L(' · 槽:',' · slots:') + p.slots.map(s => 'x' + s.lanes + (s.src === 'cpu' ? 'CPU' : L('芯','chip'))).join('+'))
           : c.k === 'ram' ? ('DDR' + p.gen + ' ' + p.size + 'G ' + p.mt + 'MT/s')
-          : c.k === 'gpu' ? (p.vram + 'G · ' + p.bw + 'GB/s · SM' + p.sm + ' · ' + p.tdp + 'W' + (p.mod ? ' · 魔改' : ''))
-          : c.k === 'ssd' ? (p.type === 'nvme' ? 'NVMe Gen' + p.gen + ' ' + p.read + 'MB/s' : 'SATA机械 ' + p.read + 'MB/s')
+          : c.k === 'gpu' ? (p.vram + 'G · ' + p.bw + 'GB/s · SM' + p.sm + ' · ' + p.tdp + 'W' + (p.mod ? L(' · 魔改',' · modded') : ''))
+          : c.k === 'ssd' ? (p.type === 'nvme' ? 'NVMe Gen' + p.gen + ' ' + p.read + 'MB/s' : L('SATA机械 ','SATA HDD ') + p.read + 'MB/s')
           : c.k === 'psu' ? (p.w + 'W · 8pin×' + p.conn8 + ' · 16pin×' + p.conn16pin)
-          : c.k === 'cooler' ? ('解热' + p.cap + 'W · ' + (p.type === 'aio' ? '360水冷' : '风冷'))
-          : ('限长' + p.gpuMaxLen + 'mm · ' + p.fans + '风扇');
-        d.innerHTML = '<span class="pr">¥' + p.price.toLocaleString() + (lim && n ? ' <b style="color:#3fd68f">已装×' + n + '/' + lim + '</b>' : '') + '</span><div class="nm">' + p.name + '</div><div class="sp">' + sp + '</div>' + (p.note ? '<div class="sp" style="color:#6fa8dc">📌' + p.note.slice(0, 46) + (p.note.length > 46 ? '…' : '') + '</div>' : '');
-        d.title = p.note || '';
+          : c.k === 'cooler' ? (L('解热','cools ') + p.cap + 'W · ' + (p.type === 'aio' ? L('360水冷','AIO 360') : L('风冷','air')))
+          : (L('限长','GPU limit ') + p.gpuMaxLen + 'mm · ' + p.fans + L('风扇',' fans'));
+        d.innerHTML = '<span class="pr">¥' + p.price.toLocaleString() + (lim && n ? ' <b style="color:#3fd68f">' + L('已装×','equipped ') + n + '/' + lim + '</b>' : '') + '</span><div class="nm">' + DN(p.name) + '</div><div class="sp">' + sp + '</div>' + (p.note ? '<div class="sp" style="color:#6fa8dc">📌' + DN(p.note).slice(0, 46) + (p.note.length > 46 ? '…' : '') + '</div>' : '');
+        d.title = DN(p.note) || '';
         d.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', p.id); });
         d.addEventListener('dblclick', () => install(p.id, p.cat));
         el.appendChild(d);
@@ -190,8 +190,9 @@ window.installSpare = uid => {
   const s = spares.find(x => x.uid === uid);
   if (!s) return;
   if (!install(s.id, s.cat, null, uid)) {
-    const nm = (P.byId(s.id) || {}).name || s.cat;
-    const msg = '装不回去：' + nm + ' 对应的插槽已满（显卡 2 张 / 固态 4 块 / 内存槽已插满）';
+    const nm = DN((P.byId(s.id) || {}).name) || s.cat;
+    const msg = L('装不回去：' + nm + ' 对应的插槽已满（显卡 2 张 / 固态 4 块 / 内存槽已插满）',
+      'Cannot reinstall ' + nm + ' — all matching slots are full (2 GPUs / 4 drives / every DIMM slot used).');
     if (window.STRATA_3D && window.STRATA_3D.toast) window.STRATA_3D.toast(msg);
     else alert(msg);
   }
@@ -247,7 +248,7 @@ function renderCase(a) {
   if (build.mobo) {
     const m = P.byId(build.mobo);
     s += '<g class="partBox" data-cat="mobo"><rect x="' + G.mobo.x + '" y="' + G.mobo.y + '" width="' + G.mobo.w + '" height="' + G.mobo.h + '" rx="6" fill="#14202e" stroke="#3fd68f" stroke-width="1.5"/>';
-    s += '<text x="' + (G.mobo.x + 8) + '" y="' + (G.mobo.y + 16) + '" fill="#7fd1a0" font-size="11">' + m.name + '（' + m.socket + '）</text>';
+    s += '<text x="' + (G.mobo.x + 8) + '" y="' + (G.mobo.y + 16) + '" fill="#7fd1a0" font-size="11">' + DN(m.name) + ' (' + m.socket + ')</text>';
     /* PCIe 槽（电气着色）。装了卡的槽不再画槽标签：
      * 显卡块画在槽上面，标签尾巴会从块边缘露出来，和显卡型号叠成一团。 */
     const gpuSlots = new Set((a.gpuAssign || []).map(g => g.slotPos));
@@ -256,7 +257,7 @@ function renderCase(a) {
       const col = p.frac >= 0.9 ? '#3fd68f' : p.frac >= 0.5 ? '#ffb454' : '#ff5d6c';
       s += '<rect x="' + g.x + '" y="' + g.y + '" width="' + g.w + '" height="' + g.h + '" rx="3" fill="#0a0f18" stroke="' + col + '" stroke-width="1.6"/>';
       if (gpuSlots.has(p.pos)) return;
-      s += '<text x="' + (g.x + g.w + 6) + '" y="' + (g.y + 15) + '" fill="' + col + '" font-size="10">槽' + p.pos + ' x' + p.lanes + ' Gen' + p.gen + ' · ' + p.gbps + 'GB/s · frac ' + p.frac + (p.src === 'chipset' ? ' 芯片组' : '') + '</text>';
+      s += '<text x="' + (g.x + g.w + 6) + '" y="' + (g.y + 15) + '" fill="' + col + '" font-size="10">' + L('槽','Slot ') + p.pos + ' x' + p.lanes + ' Gen' + p.gen + ' · ' + p.gbps + 'GB/s · frac ' + p.frac + (p.src === 'chipset' ? L(' 芯片组',' · chipset') : '') + '</text>';
     });
     /* 内存槽（稀疏槽位制：索引0=CPU侧最近槽；同字母=同通道，典型 A1A2B1B2） */
     const chan = m.memChan || Array.from({ length: m.memSlots }, (_, i) => String.fromCharCode(65 + Math.floor(i / 2)));
@@ -274,11 +275,11 @@ function renderCase(a) {
     /* M.2 */
     build.ssd.forEach((x, i) => {
       const g = G.m2[i % 2]; const off = i >= 2 ? 24 : 0;
-      s += '<g class="partBox" data-cat="ssd" data-idx="' + i + '"><rect x="' + g.x + '" y="' + (g.y + 30 + off) + '" width="70" height="12" rx="2" fill="#0f2a26" stroke="#54d6c8"/><text x="' + (g.x + 76) + '" y="' + (g.y + 40 + off) + '" fill="#54d6c8" font-size="9">' + P.byId(x).name + '</text></g>';
+      s += '<g class="partBox" data-cat="ssd" data-idx="' + i + '"><rect x="' + g.x + '" y="' + (g.y + 30 + off) + '" width="70" height="12" rx="2" fill="#0f2a26" stroke="#54d6c8"/><text x="' + (g.x + 76) + '" y="' + (g.y + 40 + off) + '" fill="#54d6c8" font-size="9">' + DN(P.byId(x).name) + '</text></g>';
     });
     s += '</g>';
   } else {
-    s += '<rect x="' + G.mobo.x + '" y="' + G.mobo.y + '" width="' + G.mobo.w + '" height="' + G.mobo.h + '" rx="6" fill="none" stroke="#2d3646" stroke-dasharray="6 4"/><text x="290" y="230" fill="#3d4a61" font-size="13">拖入主板</text>';
+    s += '<rect x="' + G.mobo.x + '" y="' + G.mobo.y + '" width="' + G.mobo.w + '" height="' + G.mobo.h + '" rx="6" fill="none" stroke="#2d3646" stroke-dasharray="6 4"/><text x="290" y="230" fill="#3d4a61" font-size="13">' + L('拖入主板','Drop a motherboard here') + '</text>';
   }
   /* CPU + 散热器 */
   if (build.cpu) {
@@ -293,12 +294,12 @@ function renderCase(a) {
         s += '<circle cx="' + (p.x + 60) + '" cy="' + (p.y + 60) + '" r="34" fill="#0d1520" stroke="#7fd1ff"/>';
         s += fanSVG(p.x + 60, p.y + 60, 26, running ? 'spinning' : '', '#7fd1ff');
         s += '<path d="M' + (p.x + 100) + ',' + (p.y + 20) + ' C 420,40 480,60 540,50 M' + (p.x + 100) + ',' + (p.y + 30) + ' C 420,55 480,75 540,66" stroke="#2c3a52" stroke-width="7" fill="none" class="cable' + (running ? ' done' : '') + '" data-cab="aio"/>';
-        s += '<text x="' + (p.x + 14) + '" y="' + (p.y + 114) + '" fill="#7fd1ff" font-size="9">360水冷</text></g>';
+        s += '<text x="' + (p.x + 14) + '" y="' + (p.y + 114) + '" fill="#7fd1ff" font-size="9">' + L('360水冷','AIO 360') + '</text></g>';
       } else {
         s += '<g class="partBox" data-cat="cooler"><rect x="' + p.x + '" y="' + p.y + '" width="120" height="120" rx="4" fill="#141d2b" stroke="#7fd1ff"/>';
         for (let i = 0; i < 9; i++) s += '<rect x="' + (p.x + 8 + i * 12) + '" y="' + (p.y + 6) + '" width="4" height="108" fill="#22304a"/>';
         s += fanSVG(p.x + 60, p.y + 60, 30, running ? 'spinning' : '', '#7fd1ff');
-        s += '<text x="' + (p.x + 14) + '" y="' + (p.y + 116) + '" fill="#7fd1ff" font-size="9">' + co.name + '</text></g>';
+        s += '<text x="' + (p.x + 14) + '" y="' + (p.y + 116) + '" fill="#7fd1ff" font-size="9">' + DN(co.name) + '</text></g>';
       }
     }
   }
@@ -311,10 +312,10 @@ function renderCase(a) {
     s += '<rect x="' + slot.x + '" y="' + (slot.y - 4) + '" width="' + (slot.w + 40) + '" height="' + hgt + '" rx="4" fill="#1a1220" stroke="' + col + '" stroke-width="1.6"/>';
     s += fanSVG(slot.x + 40, slot.y + hgt / 2 - 4, Math.min(16, hgt / 2 - 3), running ? 'spinning fast' : '', '#ff4d6d');
     s += fanSVG(slot.x + 100, slot.y + hgt / 2 - 4, Math.min(16, hgt / 2 - 3), running ? 'spinning fast' : '', '#ff4d6d');
-    s += '<text x="' + (slot.x + 140) + '" y="' + (slot.y + 14) + '" fill="#ff8fa5" font-size="10">' + g.name + ' · ' + g.vram + 'G</text>';
+    s += '<text x="' + (slot.x + 140) + '" y="' + (slot.y + 14) + '" fill="#ff8fa5" font-size="10">' + DN(g.name) + ' · ' + g.vram + 'G</text>';
     /* 第二行承接原来槽标签的信息（槽位标签在装卡后会被隐藏） */
     const slotP = (a.pcie || []).find(p => p.pos === g.slotPos) || {};
-    s += '<text x="' + (slot.x + 140) + '" y="' + (slot.y + 27) + '" fill="' + col + '" font-size="9">x' + g.slot.lanes + ' Gen' + (slotP.gen || '?') + ' ' + g.slot.gbps + 'GB/s · frac ' + g.slot.frac + ' · ' + g.tdp + 'W' + (slotP.src === 'chipset' ? ' · 芯片组' : '') + '</text>';
+    s += '<text x="' + (slot.x + 140) + '" y="' + (slot.y + 27) + '" fill="' + col + '" font-size="9">x' + g.slot.lanes + ' Gen' + (slotP.gen || '?') + ' ' + g.slot.gbps + 'GB/s · frac ' + g.slot.frac + ' · ' + g.tdp + 'W' + (slotP.src === 'chipset' ? L(' · 芯片组',' · chipset') : '') + '</text>';
     /* 供电线 */
     s += '<path d="M150,470 C 160,' + (slot.y + 60) + ' 170,' + (slot.y + 40) + ' ' + (slot.x + 10) + ',' + (slot.y + 10) + '" stroke="#ffd166" stroke-width="4" fill="none" opacity=".85" class="cable' + (running ? ' done' : '') + '" data-cab="gpu' + i + '"/>';
     s += '</g>';
@@ -324,8 +325,8 @@ function renderCase(a) {
     const ps = P.byId(build.psu), b = G.psuBay;
     s += '<g class="partBox" data-cat="psu"><rect x="' + b.x + '" y="' + (b.y + 14) + '" width="200" height="66" rx="6" fill="#1c1a12" stroke="#ffd166"/>';
     s += fanSVG(b.x + 40, b.y + 47, 24, running ? 'spinning' : '', '#ffd166');
-    s += '<text x="' + (b.x + 76) + '" y="' + (b.y + 42) + '" fill="#ffd166" font-size="10">' + ps.name + '</text>';
-    s += '<text x="' + (b.x + 76) + '" y="' + (b.y + 58) + '" fill="#8b98ab" font-size="9">24pin 主供电</text></g>';
+    s += '<text x="' + (b.x + 76) + '" y="' + (b.y + 42) + '" fill="#ffd166" font-size="10">' + DN(ps.name) + '</text>';
+    s += '<text x="' + (b.x + 76) + '" y="' + (b.y + 58) + '" fill="#8b98ab" font-size="9">' + L('24pin 主供电','24-pin main power') + '</text></g>';
     s += '<path d="M350,' + (b.y + 24) + ' C 380,380 400,300 520,80" stroke="#ffd166" stroke-width="5" fill="none" opacity=".8" class="cable' + (running ? ' done' : '') + '" data-cab="atx"/>';
     s += '<path d="M350,' + (b.y + 34) + ' C 340,300 320,240 ' + (G.cpuSock.x + 100) + ',' + (G.cpuSock.y + 10) + '" stroke="#3fb6ff" stroke-width="4" fill="none" opacity=".8" class="cable' + (running ? ' done' : '') + '" data-cab="eps"/>';
   }
@@ -340,19 +341,19 @@ function renderCase(a) {
   }
   /* 核显输出示意 */
   if (a.igpuChosen && build.cpu) {
-    s += '<g class="led ' + (running ? 'on' : '') + '"><rect x="548" y="150" width="70" height="46" rx="4" fill="#0d1520" stroke="#3fb6ff"/><text x="556" y="168" fill="#3fb6ff" font-size="9">核显输出</text><text x="556" y="182" fill="#8b98ab" font-size="8">' + P.byId(build.cpu).igpu + ' → 显示器</text></g>';
+    s += '<g class="led ' + (running ? 'on' : '') + '"><rect x="548" y="150" width="70" height="46" rx="4" fill="#0d1520" stroke="#3fb6ff"/><text x="556" y="168" fill="#3fb6ff" font-size="9">' + L('核显输出','iGPU output') + '</text><text x="556" y="182" fill="#8b98ab" font-size="8">' + P.byId(build.cpu).igpu + L(' → 显示器',' → display') + '</text></g>';
   }
   svg.innerHTML = s;
   /* 机箱内点击退回。注意：内存条/SSD 的 partBox 嵌在主板 partBox 内，
    * 必须 stopPropagation，否则点内存会连带冒泡触发主板的移除确认（用户反馈 bug） */
-  const CATNAME = { cpu: 'CPU', mobo: '主板', ram: '内存条', gpu: '显卡', ssd: 'M.2 固态硬盘', psu: '电源', cooler: 'CPU 散热器', case: '机箱' };
+  const CATNAME = { cpu: 'CPU', mobo: L('主板','Motherboard'), ram: L('内存条','Memory'), gpu: L('显卡','GPU'), ssd: L('M.2 固态硬盘','M.2 SSD'), psu: L('电源','PSU'), cooler: L('CPU 散热器','CPU cooler'), case: L('机箱','Case') };
   svg.querySelectorAll('.partBox').forEach(el => {
     el.addEventListener('click', ev => {
       ev.stopPropagation();
       const nm = (el.querySelector('text') ? el.querySelector('text').textContent : '') || CATNAME[el.dataset.cat];
       window.uiPopAt(el, {
-        danger: true, okLabel: '移除',
-        text: (el.dataset.cat === 'case' ? '移除整只 <b>' : '从机箱移除 <b>') + nm + '</b>？',
+        danger: true, okLabel: L('移除','Remove'),
+        text: (el.dataset.cat === 'case' ? L('移除整只 <b>','Remove the whole <b>') : L('从机箱移除 <b>','Remove <b>')) + nm + '</b>?',
         onOk: () => removePart(el.dataset.cat, el.dataset.idx != null ? +el.dataset.idx : undefined),
       });
     });
@@ -378,13 +379,13 @@ function renderCase(a) {
       ev.stopPropagation();
       const types = [...new Set([].concat(build.ram, []).filter(Boolean))];
       if (!types.length) {
-        window.uiPopAt(el, { text: '先把一条内存拖到任意槽，再点其它空槽即可复制插入', okLabel: '知道了', cancel: false });
+        window.uiPopAt(el, { text: L('先把一条内存拖到任意槽，再点其它空槽即可复制插入','Drag one memory stick into any slot first, then click another empty slot to copy it there.'), okLabel: L('知道了','Got it'), cancel: false });
         return;
       }
       window.uiPopAt(el, {
-        text: '插入到槽 <b>' + (slotName[+el.dataset.slot] || el.dataset.slot) + '</b>',
+        text: L('插入到槽 <b>','Insert into slot <b>') + (slotName[+el.dataset.slot] || el.dataset.slot) + '</b>',
         choices: types.map(t => ({
-          label: P.byId(t).name,
+          label: DN(P.byId(t).name),
           onPick: () => install(t, 'ram', +el.dataset.slot),
         })),
       });
@@ -423,7 +424,7 @@ function applyView() {
   document.getElementById('case3d').style.display = view3d ? 'block' : 'none';
   document.getElementById('btnDoor').style.display = view3d ? '' : 'none';
   document.getElementById('btnReset').style.display = view3d ? '' : 'none';
-  document.getElementById('btnView').textContent = view3d ? '⇄ 切回 2D' : '⇄ 切到 3D';
+  document.getElementById('btnView').textContent = view3d ? L('⇄ 切回 2D','⇄ 2D view') : L('⇄ 切到 3D','⇄ 3D view');
   /* 顶部大按钮只属于 2D：进了 3D 它就没有意义了（还会白占 90px 高度） */
   const big = document.getElementById('cta3dBig');
   if (big) big.classList.toggle('gone', view3d);
@@ -443,15 +444,25 @@ function applyView() {
  * 实际上 99% 是下面两种之一，直接把人指到正确操作上。 */
 function why3dUnavailable() {
   if (location.protocol === 'file:') {
-    return '当前是 file:// 直接打开的 src/index.html。浏览器会拦截 ES module 与本地资源请求，3D 起不来。\n\n' +
+    return L(
+      '当前是 file:// 直接打开的 src/index.html。浏览器会拦截 ES module 与本地资源请求，3D 起不来。\n\n' +
       '两条路任选：\n' +
       '① 打开单文件版 dist/strata-pc-simulator.html（3D 已内联，双击即用）\n' +
-      '② 在项目根目录运行 npm run serve，再访问 http://127.0.0.1:8080/src/index.html';
+      '② 在项目根目录运行 npm run serve，再访问 http://127.0.0.1:8080/src/index.html',
+      'You opened src/index.html from file://. Browsers block ES modules and local asset requests there, so 3D cannot start.\n\n' +
+      'Either://n' +
+      '1) open the single-file build dist/strata-pc-simulator.html (3D is inlined, double-click works)\n' +
+      '2) run npm run serve at the repo root, then open http://127.0.0.1:8080/src/index.html');
   }
-  return '3D 模块没能加载：取不到 ../vendor/three.module.js。\n\n' +
+  return L(
+    '3D 模块没能加载：取不到 ../vendor/three.module.js。\n\n' +
     '最常见原因：把 src/ 当成了服务根目录。src/index.html 引用的是 ../vendor/ 和 ../assets/，\n' +
     '服务根必须是仓库根目录。\n\n' +
-    '在仓库根目录运行 npm run serve，然后打开 http://127.0.0.1:8080/src/index.html';
+    '在仓库根目录运行 npm run serve，然后打开 http://127.0.0.1:8080/src/index.html',
+    'The 3D module did not load: ../vendor/three.module.js could not be fetched.\n\n' +
+    'Most common cause: serving src/ as the root. src/index.html loads ../vendor/ and ../assets/, \n' +
+    'so the server root must be the repository root.\n\n' +
+    'Run npm run serve at the repo root, then open http://127.0.0.1:8080/src/index.html');
 }
 function show3dNotice() {
   const wrap = document.getElementById('caseWrap');
@@ -459,7 +470,7 @@ function show3dNotice() {
   const d = document.createElement('div');
   d.id = 'notice3d';
   d.className = 'notice3d';
-  d.innerHTML = '<b>3D 视图不可用</b><pre></pre>';
+  d.innerHTML = '<b>' + L('3D 视图不可用','3D view unavailable') + '</b><pre></pre>';
   d.querySelector('pre').textContent = why3dUnavailable();
   wrap.appendChild(d);
 }
@@ -472,10 +483,10 @@ function mark3dState() {
     if (ok) {
       b.classList.remove('off');
       b.title = '';
-      b.textContent = view3d ? '⇄ 切回 2D' : '⇄ 切到 3D';
+      b.textContent = view3d ? L('⇄ 切回 2D','⇄ 2D view') : L('⇄ 切到 3D','⇄ 3D view');
     } else {
       b.classList.add('off');
-      b.textContent = '⇄ 3D 不可用';
+      b.textContent = L('⇄ 3D 不可用','⇄ 3D unavailable');
       b.title = why3dUnavailable();
     }
   }
@@ -485,15 +496,15 @@ function mark3dState() {
     const tb = big.querySelector('.tx b'), ti = big.querySelector('.tx i'), ic = big.querySelector('.ic'), go = big.querySelector('.go');
     if (!ok) {
       ic.textContent = '⚠';
-      tb.textContent = '3D 视图不可用';
-      ti.textContent = '点击查看原因（多半是服务根目录或直接双击了 src/index.html）';
-      go.textContent = '看原因';
+      tb.textContent = L('3D 视图不可用','3D view unavailable');
+      ti.textContent = L('点击查看原因（多半是服务根目录或直接双击了 src/index.html）','Click to see why (usually the wrong server root, or src/index.html opened from disk)');
+      go.textContent = L('看原因','See why');
       big.title = why3dUnavailable();
     } else {
       ic.textContent = '⬢';
-      tb.textContent = '进入 3D 实景装机台';
-      ti.textContent = '真机开箱 · 玻璃侧透 · 点哪拆哪 · 开机跑分';
-      go.textContent = '开始装机 →';
+      tb.textContent = L('进入 3D 实景装机台','Open the 3D build bench');
+      ti.textContent = L('真机开箱 · 玻璃侧透 · 点哪拆哪 · 开机跑分','Real hardware · glass side panel · click to remove · boot & bench');
+      go.textContent = L('开始装机 →','Start building →');
       big.title = '';
     }
   }
@@ -504,18 +515,18 @@ function mark3dState() {
     const t = cta.querySelector('.t'), s = cta.querySelector('.s'), ic = cta.querySelector('.ic');
     if (!ok) {
       ic.textContent = '⚠';
-      t.textContent = '3D 不可用';
-      s.textContent = '点击查看原因';
+      t.textContent = L('3D 不可用','3D unavailable');
+      s.textContent = L('点击查看原因','Click to see why');
       cta.title = why3dUnavailable();
     } else if (view3d) {
       ic.textContent = '▦';
-      t.textContent = '切回 2D 平面图';
-      s.textContent = '回到装配视图继续换件';
+      t.textContent = L('切回 2D 平面图','Back to 2D layout');
+      s.textContent = L('回到装配视图继续换件','Keep swapping parts in 2D');
       cta.title = '';
     } else {
       ic.textContent = '⬢';
-      t.textContent = '进入 3D 实景装机台';
-      s.textContent = '真机模型 · 玻璃侧透 · 可拆可装';
+      t.textContent = L('进入 3D 实景装机台','Open 3D bench');
+      s.textContent = L('真机模型 · 玻璃侧透 · 可拆可装','Real parts · glass panel · take apart');
       cta.title = '';
     }
   }
@@ -541,24 +552,25 @@ window.addEventListener('load', () => setTimeout(mark3dState, 200));
 /* ---- 主刷新 ---- */
 function onChange() {
   document.getElementById('vCtx').textContent = (+document.getElementById('sCtx').value) + 'K';
-  document.getElementById('vConc').textContent = document.getElementById('sConc').value + ' 路';
+  document.getElementById('vConc').textContent = document.getElementById('sConc').value + L(' 路','');
   const st = settings();
   const a = P.analyze(build, st);
   renderShelves();
   renderCase(a);
   if (view3d && inited3d) { window.STRATA_3D.sync(build, a); window.STRATA_3D.setSpares(spares); }
-  document.getElementById('priceTag').textContent = '整机参考造价 ¥' + totalPrice().toLocaleString() + '（闲鱼 2026-10-17 成交行情：内存/SSD 已按涨价潮校准）';
+  document.getElementById('priceTag').textContent = L('整机参考造价 ¥' + totalPrice().toLocaleString() + '（闲鱼 2026-10-17 成交行情：内存/SSD 已按涨价潮校准）',
+    'Reference build cost ¥' + totalPrice().toLocaleString() + ' (Xianyu second-hand, 2026-10-17; RAM/SSD priced in the late-2026 spike)');
   const btn = document.getElementById('bootBtn');
   if (!running) {
     btn.disabled = !a.canPost;
     btn.classList.toggle('ready', a.canPost);
-    btn.textContent = a.canPost ? '启动' : '未就绪';
+    btn.textContent = a.canPost ? L('启动','Power on') : L('未就绪','Not ready');
   }
   /* 跑分按钮：只有开机运行中才可用（状态收口在 app2.js 的 syncBenchBtn） */
   if (window.syncBenchBtn) window.syncBenchBtn();
   else {
     const bb = document.getElementById('benchBtn');
-    if (bb) { bb.disabled = !running; bb.title = running ? '跑一遍 StrataBench' : '先按启动点亮机器'; }
+    if (bb) { bb.disabled = !running; bb.title = running ? L('跑一遍 StrataBench','Run StrataBench') : L('先按启动点亮机器','Power on first'); }
   }
   if (window.updateStatus) updateStatus(a, st);
 }
@@ -567,7 +579,7 @@ document.querySelectorAll('#strataBar select,#strataBar input').forEach(el => el
 
 /* 初始化权重下拉 */
 P.models.forEach(m => {
-  const o = document.createElement('option'); o.value = m.id; o.textContent = m.name;
+  const o = document.createElement('option'); o.value = m.id; o.textContent = DN(m.name);
   document.getElementById('sModel').appendChild(o);
 });
 document.getElementById('sModel').value = 'ud_q4';

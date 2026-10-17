@@ -211,6 +211,9 @@ function meshFilterMat(w, h) {
 /* ---------------- 场景常量布局（mm） ----------------
  * 机箱前后方向：Z=0 是进风面（3 个机箱风扇），Z=450 是尾部（主板 I/O、显卡挡板、
  * 电源接口、排风网）。所有配件都贴 Z=450 这一侧对齐。 */
+/* 双语助手：i18n.js 先于本模块加载，直接读 window.L；无 window 时回落中文 */
+const TM = (zh, en) => (typeof window !== 'undefined' && window.L) ? window.L(zh, en) : zh;
+
 const L = {
   caseIn: { w: 210, h: 470, d: 450 },           // 机箱内腔：深×高×长
   mobo: { x: 8, y0: 110, z0: 200, w: 244, h: 305 }, // 主板平面（YZ），厚1.6。z0=200 → 板尾 I/O 在 444
@@ -1306,13 +1309,13 @@ function bindPointer() {
         toggleDoor();                       // 玻璃侧盖：单击开合
       } else if (removeCb) {
         const p = down.obj.userData.pick;
-        const nm = P.byId(p.id) ? P.byId(p.id).name : (p.cat === 'case' ? '机箱' : p.cat);
+        const nm = P.byId(p.id) ? DN(P.byId(p.id).name) : (p.cat === 'case' ? TM('机箱','Case') : p.cat);
         const target = down.obj;
         showPickPop({
-          obj: target, danger: true, okLabel: '移除',
+          obj: target, danger: true, okLabel: TM('移除','Remove'),
           text: p.cat === 'case'
-            ? '移除整只 <b>' + esc(nm) + '</b>？'
-            : '从机箱移除 <b>' + esc(nm) + '</b>？',
+            ? TM('移除整只 <b>','Remove the whole <b>') + esc(nm) + '</b>?'
+            : TM('从机箱移除 <b>','Remove <b>') + esc(nm) + '</b>?',
           onOk: () => removeCb(p.cat, p.idx),
         });
       }
@@ -1392,7 +1395,7 @@ function specText(p) {
     case 'cpu':
       return (p.e ? p.p + 'P+' + p.e + 'E' : p.p + 'P') + '/' + p.thr + 'T · ' + p.socket + ' · PL2 ' + p.pl2 + 'W';
     case 'gpu':
-      return p.vram + 'GB · ' + p.len + 'mm · ' + p.thick + ' 槽 · ' + p.tdp + 'W';
+      return p.vram + 'GB · ' + p.len + 'mm · ' + p.thick + TM(' 槽',' slots') + ' · ' + p.tdp + 'W';
     case 'mobo':
       return p.form + ' · ' + p.socket + ' · ' + p.memSlots + '×DIMM · PCIe×' + p.slots.length;
     case 'ram':
@@ -1402,9 +1405,9 @@ function specText(p) {
     case 'psu':
       return p.w + 'W · ' + p.conn8 + '×8pin' + (p.conn16pin ? ' + ' + p.conn16pin + '×16pin' : '');
     case 'cooler':
-      return (p.type === 'aio' ? '一体水冷' : '风冷') + ' · 解热 ' + p.cap + 'W';
+      return (p.type === 'aio' ? TM('一体水冷','AIO liquid') : TM('风冷','Air')) + TM(' · 解热 ',' · cools ') + p.cap + 'W';
     case 'case':
-      return p.formMax + ' · 显卡≤' + p.gpuMaxLen + 'mm · ' + p.fans + ' 风扇';
+      return p.formMax + TM(' · 显卡≤',' · GPU ≤') + p.gpuMaxLen + 'mm · ' + p.fans + TM(' 风扇',' fans');
   }
   return '';
 }
@@ -1412,8 +1415,8 @@ function spareTip() {
   if (spareTipEl) return spareTipEl;
   const d = document.createElement('div');
   d.className = 'spareTip';
-  d.innerHTML = '<div class="tx"><span class="nm"></span><span class="sp"><b></b><em>点击装回</em></span></div>' +
-    '<button class="x" title="彻底删除">×</button>';
+  d.innerHTML = '<div class="tx"><span class="nm"></span><span class="sp"><b></b><em>' + TM('点击装回','click to reinstall') + '</em></span></div>' +
+    '<button class="x" title="' + TM('彻底删除','Delete') + '">×</button>';
   d.style.display = 'none';
   container.appendChild(d);
   d.querySelector('.x').addEventListener('click', ev => {
@@ -1429,7 +1432,7 @@ function showSpareTip(uid, e) {
   hoverSpare = o;
   const tip = spareTip();
   const part = P.byId(o.id);
-  tip.querySelector('.nm').textContent = (part ? part.name : o.id);
+  tip.querySelector('.nm').textContent = (part ? DN(part.name) : o.id);
   tip.querySelector('.sp b').textContent = specText(part);
   o.group.updateMatrixWorld(true);
   const b = new THREE.Box3().setFromObject(o.group);
@@ -1470,7 +1473,7 @@ function showPickPop(opt) {
 function hidePickPop() { if (window.hideUiPop) window.hideUiPop(); }
 function toast3d(text) {
   const a = anchorScreen(null);
-  window.showUiPop({ x: a.x, y: a.y, text, okLabel: '知道了', cancel: false });
+  window.showUiPop({ x: a.x, y: a.y, text, okLabel: TM('知道了','Got it'), cancel: false });
 }
 /* 光标下的备用件 uid（pointerdown / pointermove 共用） */
 function spareHitUid() {
