@@ -31,6 +31,8 @@ window.STRATA_ASSETS = {
     'psu-1250t':    { glb: 'psu_atx.glb' },
     'psu-1000p':    { glb: 'psu_atx.glb' },
     // 强制程序化（动画/教学要素密集）：
+    // 散热塔实测：混元3D 双塔 GLB 会把薄鳍片糊成金属团、且一体件替换掉旋转风扇（见 scripts/probe_cooler_glb.cjs A/B），
+    // 程序化版鳍片清晰+风扇转，观感更好 → 全部散热保持程序化（GLB 备份在 ../glb_out/simp05/cooler_tower.glb）。
     ft7f: { noGlb: true }, mft3f: { noGlb: true }, trx40: { noGlb: true }, iq2_xs: { noGlb: true },
     aio360: { noGlb: true }, ag400: { noGlb: true }, d15: { noGlb: true }, pa120se: { noGlb: true },
   },

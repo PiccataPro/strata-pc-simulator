@@ -716,6 +716,8 @@ function buildCooler(co) {
     fan.rotation.x = Math.PI / 2;
     fan.position.set(14 + finX / 2, L.cpu.y + 40, cz - (nT === 1 ? depth / 2 + 15 : depth + 26));
     g.add(fan);
+    /* 实测结论（probe_cooler_glb.cjs A/B）：混元3D 双塔 GLB 鳍片糊+风扇静态，
+       不如程序化（鳍片清晰+旋转动画），散热全部保持 noGlb，不设 anchor/fitBox。 */
   }
   return g;
 }
@@ -1631,6 +1633,8 @@ function setSpares(list) {
 }
 
 window.STRATA_3D = { init, sync, setPhase, setTelemetry, toggleDoor, resetView, setSpares,
+  /* 探针专用：把相机精确摆到 pos、看向 target（判断 GLB 朝向用，避免鼠标拖不准） */
+  setCam: (pos, target) => { if (!ready) return; camera.position.set(pos[0], pos[1], pos[2]); controls.target.set(target[0], target[1], target[2]); controls.update(); },
   toast: toast3d, hidePickPop,
   onRemove: cb => removeCb = cb,
   onSpareDelete: cb => spareDelCb = cb,
