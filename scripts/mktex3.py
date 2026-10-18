@@ -28,6 +28,11 @@ JOBS = [
     # PSU_GRILLE 暂不入库：电源顶面在仓罩内不可见（真机风扇朝下），贴了也看不到，省 ~98KB。
     # 源图已生成留存 product-refs/psu-ax1200i/tex_psu_grille.png，将来若做「电源外露」场景再启用。
     ("CASE_SHROUD_PNG",     "case-front/tex_case_shroud.png",     768, 384, True, None, None),
+    # 显卡背板（pc53 正交生成：拉丝铝+RTX logo+散热栅格+四角螺丝，铭铭验收）：
+    # 源图 1024×512 横版，栅格在长边一侧（真实背板排风口就在卡顶边缘，如 MSI SUPRIM）。
+    # rotcw 后源图上端→u=1；贴卡顶面 rot=[-π/2,0,0] 时 u→世界 +X（卡顶边缘/侧透侧），
+    # 栅格正好落在侧透最可见的那条边；v 沿卡长（源图左右端→挡板/前缘，背板两端对称无所谓）。
+    ("GPU_BACKPLATE_PNG",   "gpu-backplate/tex_gpu_backplate.png", 384, 1024, True, None, "rotcw"),
 ]
 
 def trim_white(im, tol=236):
@@ -95,6 +100,8 @@ for name, fn, W, H, alpha, crop, pre in JOBS:
         im = inv
     if pre and "rotcw" in pre:
         im = im.rotate(-90, expand=True)   # CW 90°：金手指带→左缘(u=0)，长边沿 v 轴
+    if pre and "rotccw" in pre:
+        im = im.rotate(90, expand=True)    # CCW 90°：横版→竖版，源图「上端」→ v=1 高端
     if alpha:
         im = white_to_alpha(im).resize((W, H), Image.LANCZOS)
     else:

@@ -1,4 +1,5 @@
-/* GPU 白模启用验证探针：确认两张显卡走 GLB（非程序化回退）+ glbStats 命中 + 0 错误
+/* GPU 装配验证探针（A/B 终局版）：显卡保持程序化（贴图齐全，白模已回退，见 manifest 注释），
+   GLB 只留给 cpu/psu。断言：2 张卡都在、都不走 GLB、GLB 管线本身健康（cpu/psu 命中、0 失败）。
    用法：node scripts/probe_gpu.cjs [baseUrl] */
 'use strict';
 const puppeteer = require('puppeteer-core');
@@ -17,7 +18,7 @@ const EDGE = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'
   console.log('errors:', errs.length ? errs.join(' | ') : '无');
   await b.close();
   const gpus = st.installed.filter(v => v.cat === 'gpu');
-  const ok = !errs.length && gpus.length === 2 && gpus.every(v => v.glb) && st.glb.ok >= 3 && st.glb.fail === 0;
-  console.log(ok ? 'GPU GLB PROBE: PASS' : 'GPU GLB PROBE: FAIL');
+  const ok = !errs.length && gpus.length === 2 && gpus.every(v => !v.glb) && st.glb.ok >= 2 && st.glb.fail === 0;
+  console.log(ok ? 'GPU PROBE: PASS (程序化显卡 + GLB 管线健康)' : 'GPU PROBE: FAIL');
   process.exit(ok ? 0 : 1);
 })();

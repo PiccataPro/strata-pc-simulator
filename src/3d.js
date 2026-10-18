@@ -14,7 +14,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { PANEL_NORMAL_PNG, PANEL_ROUGH_PNG } from './texdata.js';
 import { GPU_SHROUD_PNG, MOBO_PCB_PNG, CPU_IHS_PNG, FAN_HUB_PNG } from './texdata2.js';
-import { RAM_ARMOR_BLACK_PNG, RAM_ARMOR_WHITE_PNG, COOLER_TOP_PNG, AIO_PUMP_PNG, PSU_LABEL_PNG, CASE_SHROUD_PNG } from './texdata3.js';
+import { RAM_ARMOR_BLACK_PNG, RAM_ARMOR_WHITE_PNG, COOLER_TOP_PNG, AIO_PUMP_PNG, PSU_LABEL_PNG, CASE_SHROUD_PNG, GPU_BACKPLATE_PNG } from './texdata3.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 const P = window.STRATA_PARTS;
@@ -154,6 +154,7 @@ function initMaterials() {
   M.__aioPump = loadDecal(AIO_PUMP_PNG);
   M.__psuLabel = loadDecal(PSU_LABEL_PNG);
   M.__caseShroud = loadDecal(CASE_SHROUD_PNG);
+  M.__gpuBack = loadDecal(GPU_BACKPLATE_PNG);
   const grain = (mat, mm, ns) => {
     const t = M.__grain.clone();
     t.needsUpdate = true;
@@ -776,7 +777,7 @@ function buildGPU(gpu, assign, i) {
   const x0 = 4;                           // 金手指平面（插槽内的位置）
   const x1 = x0 + HGT;                    // 卡顶，朝侧透一侧
   const xc = (x0 + x1) / 2;
-  const zR = L.caseIn.d - 6;              // 卡尾贴尾部墙面（Z=444），挡板装在尾部
+  const zR = L.caseIn.d;                // 卡尾与后面板内壁齐平（铭铭 2026-10-18 定：挡板贴 I/O 面，显卡与机箱后面齐平）
   const zc = zR - len / 2;
   const botY = slotY - th;                // 散热罩底面
   const col = assign.slot.frac >= 0.9 ? 0x3fd68f : assign.slot.frac >= 0.5 ? 0xffb454 : 0xff5d6c;
@@ -793,6 +794,15 @@ function buildGPU(gpu, assign, i) {
   if (M.__gpuShroud) g.add(texPlane(HGT - 12, len - 22, M.__gpuShroud, xc, botY + 11.7, zc,
     [Math.PI / 2, 0, 0], { metal: 0.35, rough: 0.5 }));
   g.add(box(HGT - 16, 1.5, len - 18, M.alu, xc, slotY + 2.3, zc));                    // 背板
+  /* 写实背板贴图（pc53 正交生成：拉丝铝+RTX logo+栅格+四角螺丝，铭铭验收）：
+     贴卡顶面（法线 +Y，侧透主视角）。rot=[-π/2,0,0] → u 沿世界 +X（卡顶边缘，栅格落这边）、
+     v 沿 -Z（卡长）。程序化版贴背板顶 3.2；GLB 版由 postGlbDecal 在白模顶(slotY+4)补挂。 */
+  const addBack = yTop => {
+    if (M.__gpuBack) g.add(texPlane(HGT - 16, len - 18, M.__gpuBack, xc, yTop, zc,
+      [-Math.PI / 2, 0, 0], { metal: 0.85, rough: 0.32 }));
+  };
+  addBack(slotY + 3.2);
+  g.userData.postGlbDecal = () => addBack(slotY + 4.4);
   // 挡板（XY 平面，贴尾部墙面）
   g.add(box(HGT, th + 10, 2, M.steel, xc, slotY - th / 2 + 5, zR + 3));
   // 挡板开孔示意（DP/HDMI）
@@ -1006,6 +1016,7 @@ function buildBench() {
   top.position.set(105, -3 - TH / 2, 225);   // 台面正好在机箱底面 y=-3
   top.receiveShadow = true;
   scene.add(top);
+  benchTop = top;
   return top;
 }
 function loadBackdrop() {
@@ -1106,6 +1117,11 @@ function playIn(grp, cat) {
 function playOut(k, v, silent) {
   installed.delete(k);
   const g = v.group;
+  if (g.userData.droppedFree) {
+    /* 自由拖拽落桌：不播「飞向货架」动画也不销毁——setSpares 会在同一帧内
+       用自由位姿重建这只备用件，部件视觉上原地留在桌面。 */
+    scene.remove(g); disposeGroup(g); rebuildPickables(); return;
+  }
   g.userData.animOut = { t: 0, from: g.position.clone(), to: new THREE.Vector3(320, 300, 620), dur: 0.45, silent };
   setTimeout(() => { scene.remove(g); disposeGroup(g); rebuildPickables(); }, 480);
 }
@@ -1303,6 +1319,14 @@ function loop(ts) {
     const an = o.userData.animOut;
     if (an) { an.t += dt; const k = Math.min(1, an.t / an.dur); o.position.lerpVectors(an.from, an.to, k * k); }
   });
+  /* 自由拖拽落桌/回弹补间 */
+  if (deskPlace) {
+    const dp = deskPlace; dp.t += dt;
+    const k = Math.min(1, dp.t / dp.dur), e = easeOut(k);
+    dp.obj.position.lerpVectors(dp.fromP, dp.toP, e);
+    dp.obj.quaternion.slerpQuaternions(dp.fromR, dp.toR, e);
+    if (k >= 1) deskPlace = null;
+  }
   controls.update();
   composer.render();
 }
@@ -1317,6 +1341,73 @@ let down = null, dragging = false;
 const PICK_LIFT = { x: 45, y: 25, z: 0 };   // 抓起示意：朝侧透玻璃 + 向上
 const _vRight = { x: 0, y: 0, z: 0 }, _vUp = { x: 0, y: 0, z: 0 };
 
+/* ---- 自由拖拽（铭铭 2026-10-18 玩法）：按住配件在画布内拖 → 弹出脱离装配位，
+ * 跟随光标在相机焦平面移动，滚轮=绕相机竖轴旋转（Shift+滚轮=绕相机横轴侧翻），
+ * 松手：射线打到木台面 → 落桌（登记自由位姿，数据层同步拆成备用件）；
+ * 打不到台面 → 弹回装配位。纯视觉玩法：模拟数值仍由 2D/数据层决定。 ---- */
+let benchTop = null;
+let freeDrag = null;                 // {obj, uid?, orig, origRot, grabOff, cat, id}
+const freePose = new Map();          // uid -> {p:[x,y,z], r:[x,y,z]} 桌面自由位姿（不被货架重排）
+let pendingFree = null;              // 刚甩到桌面的 {cat,id,pose}，等 setSpares 生成 uid 后绑定位姿
+let deskPlace = null;                // 落桌/回弹补间 {obj, t, dur, fromP, toP, fromR, toR, onEnd}
+const _rayPlane = new THREE.Plane(), _hitPt = new THREE.Vector3();
+const _fdDir = new THREE.Vector3(), _fdUp = new THREE.Vector3(), _fdRight = new THREE.Vector3();
+
+/* 开始自由拖拽：以抓取点建一个垂直相机视线的平面，之后光标射线与该平面的交点 = 物体新家。
+   抓取瞬间沿相机 up 抬 25mm + 放大 5% = 「弹出脱离装配位」的手感。 */
+function startFreeDrag() {
+  raycaster.setFromCamera(ptr, camera);
+  const h = raycaster.intersectObject(down.obj, true)[0];
+  const anchor = h ? h.point.clone()
+    : new THREE.Box3().setFromObject(down.obj).getCenter(new THREE.Vector3());
+  camera.getWorldDirection(_fdDir);
+  _rayPlane.setFromNormalAndCoplanarPoint(_fdDir, anchor);
+  const o = down.obj;
+  freeDrag = {
+    obj: o, uid: down.spare || null, orig: down.orig.clone(), origRot: o.rotation.clone(),
+    grabOff: anchor.sub(o.position.clone()),
+    pick: o.userData.pick ? { cat: o.userData.pick.cat, id: o.userData.pick.id, idx: o.userData.pick.idx } : null,
+  };
+  controls.enabled = false; controls.enableZoom = false;
+  renderer.domElement.style.cursor = 'grabbing';
+  o.scale.setScalar(1.05);
+}
+function followFree() {
+  raycaster.setFromCamera(ptr, camera);
+  if (!raycaster.ray.intersectPlane(_rayPlane, _hitPt)) return;
+  _fdUp.set(0, 1, 0).applyQuaternion(camera.quaternion).multiplyScalar(25);
+  freeDrag.obj.position.copy(_hitPt).sub(freeDrag.grabOff).add(_fdUp);
+}
+/* 松手：射线打中木台面 → 落桌；打不到 → 补间弹回装配位 */
+function endFreeDrag() {
+  const fd = freeDrag; freeDrag = null;
+  controls.enabled = true; controls.enableZoom = true; renderer.domElement.style.cursor = 'default';
+  const obj = fd.obj;
+  obj.scale.setScalar(1);
+  raycaster.setFromCamera(ptr, camera);
+  const onDesk = benchTop && raycaster.intersectObject(benchTop, false)[0];
+  if (onDesk) {
+    /* 落桌：以射线打中的台面点为落点（指哪放哪），再按当前旋转把包围盒底面坐实到台面 y=-3 */
+    obj.position.set(onDesk.point.x, obj.position.y, onDesk.point.z);
+    obj.updateMatrixWorld(true);
+    const bb = new THREE.Box3().setFromObject(obj);
+    const pose = { p: [obj.position.x, obj.position.y + (-3 - bb.min.y), obj.position.z],
+      r: [obj.rotation.x, obj.rotation.y, obj.rotation.z] };
+    if (fd.uid) {
+      freePose.set(fd.uid, pose);                       // 台面备用件落桌：纯视觉挪位，不动数据
+      deskPlace = { obj, t: 0, dur: 0.16, fromP: obj.position.clone(), toP: new THREE.Vector3(...pose.p),
+        fromR: obj.quaternion.clone(), toR: obj.quaternion.clone() };
+    } else if (fd.pick && removeCb) {
+      obj.userData.droppedFree = true;                  // 装机件落桌：数据层拆成备用件，
+      pendingFree = { cat: fd.pick.cat, id: fd.pick.id, pose };  // setSpares 用自由位姿原地重建
+      removeCb(fd.pick.cat, fd.pick.idx);
+    }
+  } else {
+    deskPlace = { obj, t: 0, dur: 0.35, fromP: obj.position.clone(), toP: fd.orig,
+      fromR: obj.quaternion.clone(), toR: new THREE.Quaternion().setFromEuler(fd.origRot) };
+  }
+}
+
 /* 指针是否已离开机箱画布（留 6px 容差，避免贴边抖动误判） */
 function outsideCanvas(e) {
   const r = container.getBoundingClientRect(), pad = 6;
@@ -1330,15 +1421,16 @@ function bindPointer() {
     const r = el.getBoundingClientRect();
     ptr.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1);
 
-    if (down && down.obj && !down.onDoor && !dragging &&
-      Math.hypot(e.clientX - down.x, e.clientY - down.y) > 8 && outsideCanvas(e)) {
-      /* 拖出画布才进入拆件模式。画布内的拖动全部让给 OrbitControls——
-         以前只要位移超阈值就禁用控制器，导致每次拖动只转十来像素就停住。 */
-      dragging = true;
-      controls.enabled = false;
-      el.style.cursor = 'grabbing';
+    if (down && down.obj && !down.onDoor && !dragging && !freeDrag &&
+      Math.hypot(e.clientX - down.x, e.clientY - down.y) > 10) {
+      /* 画布内拖配件 → 自由拖拽（弹出/跟随/落桌）；拖出画布 → 老规矩拆件。
+         画布内的拖动全部让给 OrbitControls——以前只要位移超阈值就禁用控制器，
+         导致每次拖动只转十来像素就停住。 */
+      if (outsideCanvas(e)) { dragging = true; controls.enabled = false; el.style.cursor = 'grabbing'; }
+      else startFreeDrag();
     }
-    if (dragging && down.obj) {
+    if (freeDrag) followFree();
+    else if (dragging && down.obj) {
       /* 跟随指针（屏幕空间近似）：把像素位移投到相机的 right/up 轴上，不再按事件次数累加 */
       const m = camera.matrixWorld.elements;
       _vRight.x = m[0]; _vRight.y = m[1]; _vRight.z = m[2];
@@ -1363,7 +1455,7 @@ function bindPointer() {
     if (hoverObj && hoverObj !== root) setEmissiveBoost(hoverObj, false);
     hoverObj = root;
     if (hoverObj) setEmissiveBoost(hoverObj, true);
-    if (!dragging) el.style.cursor = hoverObj ? 'pointer' : 'default';
+    if (!dragging && !freeDrag) el.style.cursor = hoverObj ? 'pointer' : 'default';
     /* 台面备用件：悬停出标签，点一下装回机箱，点 × 才彻底删除 */
     if (!dragging && sparePickList.length) {
       const su = spareHitUid();
@@ -1377,12 +1469,15 @@ function bindPointer() {
     const hit = pickThroughGlass();
     const hitObj = hit ? hit.object : null;
     const obj = hitObj ? rootPick(hitObj) : null;
+    const spareUid = spareHitUid();
     down = {
-      x: e.clientX, y: e.clientY, obj,
+      x: e.clientX, y: e.clientY,
+      obj: obj || (spareUid && spareObjs.get(spareUid) ? spareObjs.get(spareUid).group : null),  // 台面备用件也能抓起来玩
       onDoor: hitObj ? isDoorNode(hitObj) : false,   // 命中的是玻璃侧盖 → 点击=开关门
-      spare: spareHitUid(),                          // 命中的是台面备用件 → 点击=装回机箱
-      orig: obj ? obj.position.clone() : null
+      spare: spareUid,                               // 命中的是台面备用件 → 点击=装回机箱
+      orig: null
     };
+    down.orig = down.obj ? down.obj.position.clone() : null;
     dragging = false;
     try { el.setPointerCapture(e.pointerId); } catch (err) { }
   });
@@ -1390,6 +1485,7 @@ function bindPointer() {
     controls.enabled = true;
     el.style.cursor = 'default';
     if (!down) return;
+    if (freeDrag) { endFreeDrag(); down = null; dragging = false; return; }
     const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y);
     if (!dragging && moved <= 6 && down.spare) {
       if (spareInstallCb) spareInstallCb(down.spare);   // 点台面上的零件 → 装回去
@@ -1421,9 +1517,27 @@ function bindPointer() {
     }
     down = null; dragging = false;
   });
+  /* 拖拽中滚轮 = 旋转部件（铭铭玩法）：默认绕相机竖轴（世界 Y）转，Shift+滚轮绕相机横轴侧翻。
+     不 stopPropagation → OrbitControls 自己的 wheel 也照旧缩放？不行，缩放会和旋转抢。
+     所以捕获阶段拦截：拖拽中滚轮只转部件，不缩放。 */
+  el.addEventListener('wheel', e => {
+    if (!freeDrag) return;
+    e.preventDefault(); e.stopPropagation();
+    const k = e.deltaY * 0.0035;
+    if (e.shiftKey) {
+      _fdRight.set(1, 0, 0).applyQuaternion(camera.quaternion);
+      freeDrag.obj.rotateOnWorldAxis(_fdRight, k);
+    } else {
+      freeDrag.obj.rotateOnWorldAxis(_fdUp.set(0, 1, 0), k);
+    }
+  }, { capture: true, passive: false });
   /* 指针被系统取消（切窗口、触控中断、capture 丢失）时 pointerup 不会触发。
      不兜底的话 controls.enabled 会永久停在 false——3D 旋转彻底失灵。 */
   el.addEventListener('pointercancel', () => {
+    if (freeDrag) { const fd = freeDrag; freeDrag = null; controls.enabled = true; controls.enableZoom = true;
+      fd.obj.scale.setScalar(1);
+      deskPlace = { obj: fd.obj, t: 0, dur: 0.35, fromP: fd.obj.position.clone(), toP: fd.orig,
+        fromR: fd.obj.quaternion.clone(), toR: new THREE.Quaternion().setFromEuler(fd.origRot) }; }
     if (dragging && down && down.obj) sync(build_ref, analyze_ref);
     down = null; dragging = false; controls.enabled = true; el.style.cursor = 'default';
   });
@@ -1588,7 +1702,7 @@ function setSpares(list) {
   list = list || [];
   const want = new Set(list.map(s => s.uid));
   for (const [uid, o] of [...spareObjs]) {
-    if (!want.has(uid)) { scene.remove(o.group); disposeGroup(o.group); spareObjs.delete(uid); }
+    if (!want.has(uid)) { scene.remove(o.group); disposeGroup(o.group); spareObjs.delete(uid); freePose.delete(uid); }
   }
   let n = 0;
   /* 台面排位用「货架式」紧凑摆放：沿 -Z 一件接一件排，间距按每件自己的进深算，
@@ -1611,6 +1725,21 @@ function setSpares(list) {
     /* 排位：机箱**侧面**（+X，玻璃那侧）的台面上，从机箱中段往前往下排 */
     const o = spareObjs.get(s.uid); if (!o) continue;
     const g = o.group;
+    /* 自由拖拽落桌的备用件：按用户摆放的位姿放，不参与货架排位（铭铭玩法）。
+       装机件落桌时 pendingFree 带着位姿过来，在这里绑定到 app.js 新生成的 uid 上。 */
+    if (pendingFree && !freePose.has(s.uid) && pendingFree.cat === s.cat && pendingFree.id === s.id) {
+      freePose.set(s.uid, pendingFree.pose); pendingFree = null;
+    }
+    const fp = freePose.get(s.uid);
+    if (fp) {
+      g.rotation.set(fp.r[0], fp.r[1], fp.r[2]);
+      g.position.set(fp.p[0], fp.p[1], fp.p[2]);
+      g.updateMatrixWorld(true);
+      const fb = new THREE.Box3().setFromObject(g);
+      g.position.y += -3 - fb.min.y;                    // 底面贴台面
+      g.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
+      n++; continue;
+    }
     g.rotation.set(0, 0, -Math.PI / 2);             // 侧躺平放
     g.position.set(0, 0, 0);
     g.updateMatrixWorld(true);
@@ -1635,6 +1764,86 @@ function setSpares(list) {
 window.STRATA_3D = { init, sync, setPhase, setTelemetry, toggleDoor, resetView, setSpares,
   /* 探针专用：把相机精确摆到 pos、看向 target（判断 GLB 朝向用，避免鼠标拖不准） */
   setCam: (pos, target) => { if (!ready) return; camera.position.set(pos[0], pos[1], pos[2]); controls.target.set(target[0], target[1], target[2]); controls.update(); },
+  /* 探针专用：世界坐标 → canvas 像素坐标（拖拽探针按屏幕坐标下鼠标） */
+  project: (x, y, z) => {
+    if (!ready) return null;
+    const v = new THREE.Vector3(x, y, z).project(camera);
+    const r = renderer.domElement.getBoundingClientRect();
+    return { x: (v.x * 0.5 + 0.5) * r.width, y: (-v.y * 0.5 + 0.5) * r.height, visible: v.z < 1 };
+  },
+  firstFreeScreen: () => {
+    for (const [uid, pose] of freePose) {
+      const o = spareObjs.get(uid); if (!o) continue;
+      const v = new THREE.Vector3(pose.p[0], pose.p[1] + 30, pose.p[2]).project(camera);
+      const r = renderer.domElement.getBoundingClientRect();
+      return { x: (v.x * 0.5 + 0.5) * r.width, y: (-v.y * 0.5 + 0.5) * r.height, visible: v.z < 1 };
+    }
+    return null;
+  },
+  /* 探针专用：在部件包围盒里采样，返回一个「射线最前面就是它」的屏幕点。
+     必须走 pickThroughGlass 真实拾取路径——只验 intersectObject(自己) 会骗人：
+     那个点可能先打到机箱/散热，按下选中的根本不是它。 */
+  partScreen: (cat, idx) => {
+    if (!ready) return null;
+    const v = [...installed.values()].find(x => x.cat === cat && x.idx === (idx == null ? 0 : idx));
+    if (!v) return null;
+    const bb = new THREE.Box3().setFromObject(v.group);
+    const r = renderer.domElement.getBoundingClientRect();
+    const fr = [[0.5, 0.5], [0.3, 0.5], [0.7, 0.5], [0.5, 0.3], [0.5, 0.7],
+      [0.3, 0.3], [0.7, 0.7], [0.3, 0.7], [0.7, 0.3]];
+    for (const [a, c] of fr) {
+      const w = new THREE.Vector3(bb.min.x + (bb.max.x - bb.min.x) * a,
+        bb.min.y + (bb.max.y - bb.min.y) * c, (bb.min.z + bb.max.z) / 2);
+      const n = w.project(camera);
+      const sx = (n.x * 0.5 + 0.5) * r.width, sy = (-n.y * 0.5 + 0.5) * r.height;
+      if (sx < 12 || sy < 12 || sx > r.width - 12 || sy > r.height - 12) continue;
+      raycaster.setFromCamera(new THREE.Vector2(sx / r.width * 2 - 1, -(sy / r.height * 2 - 1)), camera);
+      const hit = pickThroughGlass();
+      if (hit && rootPick(hit.object) === v.group) return { x: sx, y: sy, hit: true };
+    }
+    return null;
+  },
+  /* 探针诊断：打印部件包围盒 + 各采样点的实际命中（定位"选不中"用） */
+  dbgPick: (cat, idx) => {
+    if (!ready) return { err: 'not-ready' };
+    const v = [...installed.values()].find(x => x.cat === cat && x.idx === (idx == null ? 0 : idx));
+    if (!v) return { err: 'not-installed', have: [...installed.values()].map(x => x.cat + '#' + x.idx) };
+    const bb = new THREE.Box3().setFromObject(v.group);
+    const r = renderer.domElement.getBoundingClientRect();
+    const out = [];
+    for (const [a, c] of [[0.5, 0.5], [0.3, 0.5], [0.7, 0.5], [0.5, 0.3], [0.5, 0.7]]) {
+      const w = new THREE.Vector3(bb.min.x + (bb.max.x - bb.min.x) * a,
+        bb.min.y + (bb.max.y - bb.min.y) * c, (bb.min.z + bb.max.z) / 2);
+      const n = w.clone().project(camera);
+      const sx = (n.x * 0.5 + 0.5) * r.width, sy = (-n.y * 0.5 + 0.5) * r.height;
+      raycaster.setFromCamera(new THREE.Vector2(sx / r.width * 2 - 1, -(sy / r.height * 2 - 1)), camera);
+      const hits = raycaster.intersectObjects(pickables, true);
+      const fr = hits[0] ? rootPick(hits[0].object) : null;
+      out.push({ sx: Math.round(sx), sy: Math.round(sy), ndcZ: +n.z.toFixed(2),
+        inCanvas: sx > 12 && sy > 12 && sx < r.width - 12 && sy < r.height - 12,
+        first: fr && fr.userData.pick ? fr.userData.pick.cat + '#' + fr.userData.pick.idx : 'none',
+        isSelf: fr === v.group, selfHit: !!raycaster.intersectObject(v.group, true)[0] });
+    }
+    return { bb: [bb.min.toArray().map(Math.round), bb.max.toArray().map(Math.round)],
+      canvas: [Math.round(r.width), Math.round(r.height)], cam: camera.position.toArray().map(Math.round), samples: out };
+  },
+  /* 探针专用：扫描画布找射线打中木台面、且落在机箱 footprint 外（x>230/x<-20/z>470/z<-20）
+     的屏幕点；找不到机箱外空地就退回任意桌面点并标记 outside=false（落机箱顶上也是合法摆放）。 */
+  deskScreen: () => {
+    if (!ready || !benchTop) return null;
+    const r = renderer.domElement.getBoundingClientRect();
+    let any = null;
+    for (let fy = 0.45; fy < 0.97; fy += 0.05) for (let fx = 0.1; fx < 0.92; fx += 0.05) {
+      raycaster.setFromCamera(new THREE.Vector2(fx * 2 - 1, -(fy * 2 - 1)), camera);
+      const h = raycaster.intersectObject(benchTop, false)[0];
+      if (!h) continue;
+      const pt = { x: fx * r.width, y: fy * r.height, wx: Math.round(h.point.x), wz: Math.round(h.point.z) };
+      if (!any) any = Object.assign(pt, { outside: false, visible: true });
+      const out = h.point.x > 230 || h.point.x < -20 || h.point.z > 470 || h.point.z < -20;
+      if (out) return Object.assign(pt, { outside: true, visible: true });
+    }
+    return any;
+  },
   toast: toast3d, hidePickPop,
   onRemove: cb => removeCb = cb,
   onSpareDelete: cb => spareDelCb = cb,
@@ -1643,6 +1852,8 @@ window.STRATA_3D = { init, sync, setPhase, setTelemetry, toggleDoor, resetView, 
   debugState: () => ({
     installed: [...installed.values()].map(v => ({ cat: v.cat, idx: v.idx, id: v.id, glb: !!(v.group.userData && v.group.userData.glbWrapped) })),
     glb: glbStats, phase, ready,
+    /* 自由拖拽探针用：台面上备用件数 + 用户自由摆放数 + 是否正在拖 */
+    spareCount: spareObjs.size, freeCount: freePose.size, draggingFree: !!freeDrag,
     camera: ready ? camera.position.toArray().map(v => Math.round(v)) : null,
     target: ready ? controls.target.toArray().map(v => Math.round(v)) : null,
     canvas: renderer ? [renderer.domElement.width, renderer.domElement.height] : null,
@@ -1654,6 +1865,6 @@ window.STRATA_3D = { init, sync, setPhase, setTelemetry, toggleDoor, resetView, 
       const st = t => ({ loaded: !!t, img: !!(t && t.image && t.image.complete), inScene: count(t) });
       return { moboPcb: st(M.__moboPcb), cpuIhs: st(M.__cpuIhs), gpuShroud: st(M.__gpuShroud), fanHub: st(M.__fanHub),
         ramBlack: st(M.__ramBlack), ramWhite: st(M.__ramWhite), coolerTop: st(M.__coolerTop), aioPump: st(M.__aioPump),
-        psuLabel: st(M.__psuLabel), caseShroud: st(M.__caseShroud) };
+        psuLabel: st(M.__psuLabel), caseShroud: st(M.__caseShroud), gpuBack: st(M.__gpuBack) };
     })(),
   }) };

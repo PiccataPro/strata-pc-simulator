@@ -23,9 +23,12 @@ window.STRATA_ASSETS = {
        三轴缩放比接近真实卡比例（4070S 长/高=2.0 vs 真卡 2.31），不会拉歪。
        注意：白模无贴图，启用后替换程序化显卡（含导风罩贴图+旋转风扇），
        是否更真实以 scripts/shot.js 截图实测为准。 */
-    'rtx-3080-20g': { glb: 'gpu_rtx3080_20g.glb', rot: [0, Math.PI / 2, 0] },
-    'rtx-3080-10g': { noGlb: true },   // 无对应白模文件，保持程序化
-    'rtx-4070s':    { glb: 'gpu_rtx4070s.glb', rot: [0, Math.PI / 2, 0] },
+    /* 显卡 A/B 终局（铭铭 2026-10-18 两轮实测）：程序化版补齐写实贴图（背板/导风罩/扇毂/型号丝印/RGB）后，
+       贴图与几何严丝合缝；GLB 白模形状不规整（斜放/起伏撑大包围盒），浮贴对不齐且纯色无贴图 → 全部回退程序化。
+       白模备份在 ../glb_out/simp05/（gpu_rtx3080_20g / gpu_rtx4070s），混元3D 适合圆润大件不适合精密装配件。 */
+    'rtx-3080-20g': { noGlb: true },
+    'rtx-3080-10g': { noGlb: true },
+    'rtx-4070s':    { noGlb: true },
     'i7-14700':     { glb: 'cpu_lga1700.glb' },
     'i7-12700KF':   { glb: 'cpu_lga1700.glb' },
     'psu-1250t':    { glb: 'psu_atx.glb' },

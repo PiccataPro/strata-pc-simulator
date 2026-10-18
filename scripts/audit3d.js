@@ -180,7 +180,10 @@ for (const p of parts) {
   if (p.box.min.y < -0.5) o.push('y- ' + p.box.min.y.toFixed(1));
   if (p.box.max.y > C.h + 0.5) o.push('y+ ' + p.box.max.y.toFixed(1));
   if (p.box.min.z < -0.5) o.push('z- ' + p.box.min.z.toFixed(1));
-  if (p.box.max.z > C.d + 0.5) o.push('z+ ' + p.box.max.z.toFixed(1));
+  /* 显卡挡板必须穿过尾墙(450~453)与外面板齐平（和主板 I/O 盾同理），z+ 豁免到 456；
+     铭铭 2026-10-18 定：显卡与机箱后面齐平，挡板贴 I/O 面。 */
+  const zMax = /^gpu/.test(p.name) ? C.d + 6.5 : C.d + 0.5;
+  if (p.box.max.z > zMax) o.push('z+ ' + p.box.max.z.toFixed(1));
   if (o.length) { out++; console.log('  ✗ ' + p.name.padEnd(6) + o.join('   ')); }
 }
 if (!out) console.log('  ✓ 全部在腔内');
