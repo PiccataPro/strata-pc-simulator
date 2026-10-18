@@ -141,12 +141,18 @@ header .tag{font-size:11px;color:var(--dim)}
 .bar i{display:block;height:100%;border-radius:4px;transition:width .6s,background .6s}
 /* ---- 仪表盘 ---- */
 #dash{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-.gauge{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px;text-align:center}
+.gauge{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px;text-align:center;position:relative}
 .gauge .v{font-size:22px;font-weight:700;color:var(--acc)}
 .gauge .u{font-size:10px;color:var(--dim)}
 .gauge .t{font-size:11px;color:var(--dim);margin-bottom:2px}
 .gauge.hot .v{color:var(--err)}
 .gauge.warm .v{color:var(--warn)}
+/* 乐观口径角标：decode 展示值 = 物理值 ×1.5（DECODE_BOOST），必须标出来防止误读成物理值。
+   hover 给出物理口径原值（decodeRaw）。 */
+.gauge .opt{position:absolute;top:6px;right:7px;font-size:9px;line-height:1;padding:2px 5px;border-radius:6px;
+  background:#3a2f12;color:var(--warn);border:1px solid #6b5518;cursor:help;font-weight:600}
+#benchOv .opt{display:inline-block;font-size:10px;line-height:1;padding:3px 7px;border-radius:7px;margin-left:6px;
+  vertical-align:middle;background:#3a2f12;color:var(--warn);border:1px solid #6b5518;cursor:help;font-weight:600}
 /* ---- 底部按钮 ---- */
 footer{display:flex;align-items:center;gap:16px;padding:12px 16px;background:var(--panel);border-top:1px solid var(--line);position:sticky;bottom:0}
 #bootBtn{width:92px;height:92px;border-radius:50%;border:3px solid #2c3a52;background:radial-gradient(circle at 35% 30%,#25324a,#131a28);color:#4d5f7e;font-size:13px;font-weight:700;cursor:pointer;transition:.25s;letter-spacing:2px}

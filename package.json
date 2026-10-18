@@ -5,6 +5,8 @@
   "main": "src/parts.js",
   "scripts": {
     "test": "node test.js",
+    "i18n": "node scripts/i18ncheck.js",
+    "check": "node test.js && node scripts/i18ncheck.js",
     "build": "node scripts/build.js",
     "serve": "node scripts/serve.js",
     "audit": "node scripts/audit3d.js"
