@@ -55,7 +55,12 @@ function renderDash() {
   if (!r.ok || !r.m) { box.innerHTML = ''; return; }
   const m = r.m;
   let h = '';
-  h += gauge(L('解码吞吐','Decode'), m.decode, 't/s ' + L('单流','per stream') + (st.conc > 1 ? L('｜总 ',' | total ') + m.decodeTotal : ''), m.decode >= 55 ? '' : m.decode >= 25 ? 'warm' : 'hot');
+  /* 解码是唯一的「乐观口径」读数（物理值 ×DECODE_BOOST），右上角标出来，
+     hover 显示物理原值——不标就会被当成物理值误读（交接点评风险点1）。 */
+  const optBadge = '<span class="opt" title="' + L('展示值 = 物理口径 ×' + (m.decodeBoost || 1.5) + '（乐观系数：FA3/页式KV/双卡流水重叠）· 物理口径 ' + m.decodeRaw + ' t/s',
+    'Displayed = physical ×' + (m.decodeBoost || 1.5) + ' (optimistic: FA3 / paged KV / dual-card overlap) · physical ' + m.decodeRaw + ' t/s') + '">×' + (m.decodeBoost || 1.5) + L(' 乐观', ' opt') + '</span>';
+  h += '<div class="gauge' + (m.decode >= 55 ? '' : m.decode >= 25 ? ' warm' : ' hot') + '" style="position:relative">' + optBadge +
+    '<div class="t">' + L('解码吞吐','Decode') + '</div><div class="v">' + m.decode + '</div><div class="u">t/s ' + L('单流','per stream') + (st.conc > 1 ? L('｜总 ',' | total ') + m.decodeTotal : '') + '</div></div>';
   h += gauge(L('预填充速度','Prefill'), m.prefill, 't/s ' + L('（输入吞吐）','(prompt throughput)'));
   h += gauge(L('首字等待 TTFT','Time to first token'), m.ttft >= 100 ? Math.round(m.ttft / 60) + L('分','m ') + Math.round(m.ttft % 60) + L('秒','s') : m.ttft + 's', m.ctxK + 'K ' + L('上下文','context'));
   h += gauge(L('专家命中率','Expert hit rate'), Math.round(m.hit * 100) + '%', L('显存','VRAM ') + Math.round(m.fV * 100) + '%+' + L('内存','RAM ') + Math.round(m.fR * 100) + '%');
@@ -87,7 +92,12 @@ function renderDash() {
 /* ---- 开机流程 ---- */
 const log = (t, cls) => {
   const el = document.getElementById('bootLog');
-  el.innerHTML += '<div class="' + (cls || '') + '">[' + new Date().toLocaleTimeString() + '] ' + t + '</div>';
+  /* 原来是 el.innerHTML += …：每追加一行都要把已有全部日志重新解析成 DOM，
+     开机日志十几行 = 十几次全量重解析。改成 appendChild 一次只动一行。 */
+  const d = document.createElement('div');
+  d.className = cls || '';
+  d.textContent = '[' + new Date().toLocaleTimeString() + '] ' + t;
+  el.appendChild(d);
   el.scrollTop = el.scrollHeight;
 };
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -184,8 +194,8 @@ async function runBench() {
   const gen = ++benchGen;
   ov.style.display = 'flex';
   bar.style.width = '0%';
-  ttl.textContent = 'StrataBench 跑分';
-  const steps = ['风扇提速 · 温度爬升', 'prefill：灌入 8K 提示词', 'decode：连续生成 512 tokens', '汇总'];
+  ttl.textContent = 'StrataBench ' + L('跑分', 'benchmark');
+  const steps = [L('风扇提速 · 温度爬升', 'Fans spin up · temps climb'), L('prefill：灌入 8K 提示词', 'prefill: feeding an 8K prompt'), L('decode：连续生成 512 tokens', 'decode: generating 512 tokens'), L('汇总', 'wrapping up')];
   for (let i = 0; i < steps.length; i++) {
     if (gen !== benchGen) return;
     res.innerHTML = '<div class="ph">' + steps[i] + ' …</div>';
@@ -198,15 +208,17 @@ async function runBench() {
    * 因为它们同时驱动仪表盘，掺水会和别处的数字对不上。 */
   const SCORE_SCALE = 1.4;
   const score = Math.round((m.decode * 100 + m.prefill * 3) * SCORE_SCALE);
-  ttl.textContent = 'StrataBench · 完成';
+  ttl.textContent = 'StrataBench · ' + L('完成', 'done');
+  const optBadge2 = '<span class="opt" title="' + L('展示值 = 物理口径 ×' + (m.decodeBoost || 1.5) + ' · 物理口径 ' + m.decodeRaw + ' t/s',
+    'Displayed = physical ×' + (m.decodeBoost || 1.5) + ' · physical ' + m.decodeRaw + ' t/s') + '">×' + (m.decodeBoost || 1.5) + L(' 乐观', ' opt') + '</span>';
   res.innerHTML =
-    brow('解码吞吐', m.decode.toFixed(1) + ' t/s' + (st.conc > 1 ? '（总 ' + m.decodeTotal.toFixed(1) + '）' : '')) +
+    brow(L('解码吞吐', 'Decode') + optBadge2, m.decode.toFixed(1) + ' t/s' + (st.conc > 1 ? L('（总 ', ' (total ') + m.decodeTotal.toFixed(1) + L('）', ')') : '')) +
     brow('Prefill', Math.round(m.prefill) + ' t/s') +
-    brow('首字延迟 TTFT', m.ttft >= 100 ? Math.round(m.ttft / 60) + ' 分 ' + Math.round(m.ttft % 60) + ' 秒' : m.ttft + ' s') +
-    brow('整机功率', Math.round(m.power) + ' W') +
-    brow('GPU 温度', m.temps.gpu.join(' / ') + ' °C') +
+    brow(L('首字延迟 TTFT', 'Time to first token'), m.ttft >= 100 ? Math.round(m.ttft / 60) + L(' 分 ', 'm ') + Math.round(m.ttft % 60) + L(' 秒', 's') : m.ttft + ' s') +
+    brow(L('整机功率', 'Wall power'), Math.round(m.power) + ' W') +
+    brow('GPU ' + L('温度', 'temps'), m.temps.gpu.join(' / ') + ' °C') +
     '<div class="score">' + score.toLocaleString() + '</div>' +
-    '<div class="sl">综合分 =（解码×100 + Prefill×3）× 1.4 —— 只用于同配置横向比较</div>';
+    '<div class="sl">' + L('综合分 =（解码×100 + Prefill×3）× 1.4 —— 只用于同配置横向比较', 'Score = (decode×100 + prefill×3) × 1.4 — for comparing identical configs only') + '</div>';
 }
 document.getElementById('benchBtn').addEventListener('click', runBench);
 document.getElementById('benchClose').addEventListener('click', () => {

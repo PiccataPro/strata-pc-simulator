@@ -1174,6 +1174,10 @@ function easeOut(k) { return 1 - Math.pow(1 - k, 3); }
 /* ---- 主循环 ---- */
 function loop(ts) {
   requestAnimationFrame(loop);
+  /* 容器被隐藏（切回 2D → display:none，clientWidth 归 0）时跳过整帧：
+     bloom 后处理 + 2048² PCFSoft 阴影每帧全量重绘，用户看不见却一直在烧
+     GPU/CPU。这里保留 rAF 心跳（极廉价），一旦切回 3D 容器有尺寸即自动恢复。 */
+  if (!container || container.clientWidth === 0 || container.clientHeight === 0) { loop.last = ts; return; }
   const dt = Math.min(0.05, (ts - (loop.last || ts)) / 1000); loop.last = ts;
   const time = (ts - t0) / 1000;
   // 风扇
@@ -1257,7 +1261,12 @@ function bindPointer() {
         down.orig.z + _vRight.z * dx - _vUp.z * dy + PICK_LIFT.z
       );
     }
-    // hover
+    // hover —— 射线拾取（pickThroughGlass + spareHitUid 各一次全场景递归求交）
+    // 节流到 ~16/s：高刷鼠标每秒能触发上百次 pointermove，逐次求交纯属浪费，
+    // 高亮晚 60ms 出现人眼无感。ptr 与拖拽跟随仍逐事件更新，不影响手感。
+    const now = performance.now();
+    if (now - (bindPointer._hoverAt || 0) < 60) return;
+    bindPointer._hoverAt = now;
     raycaster.setFromCamera(ptr, camera);
     const hit = pickThroughGlass();
     const root = hit ? rootPick(hit.object) : null;

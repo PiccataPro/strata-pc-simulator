@@ -154,10 +154,11 @@
 
   /* ================= 矩阵规则 ================= */
 
-  function byId(id) {
-    const all = [].concat(cpus, mobos, dimms, gpus, ssds, psus2, coolers, cases);
-    return all.find(p => p.id === id) || null;
-  }
+  /* 查表缓存：原来每次调用都 concat 出 47 元素新数组再 find，
+     而 byId 被 totalPrice/货架/机箱/读数高频调用（一次 onChange 几十次）。
+     配件库是纯静态数据，建一次 Map 索引即可。 */
+  const _idx = new Map([].concat(cpus, mobos, dimms, gpus, ssds, psus2, coolers, cases).map(p => [p.id, p]));
+  function byId(id) { return _idx.get(id) || null; }
 
   /* 内存分析：槽位按主板 memChan 布局（典型 A1A2B1B2，索引0=CPU侧最近槽）。
    * build.ram 为稀疏数组：build.ram[i] = 槽i 的内存条 id 或 null。

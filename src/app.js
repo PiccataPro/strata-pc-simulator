@@ -550,9 +550,14 @@ document.getElementById('btnReset').addEventListener('click', () => window.STRAT
 window.addEventListener('load', () => setTimeout(mark3dState, 200));
 
 /* ---- 主刷新 ---- */
-function onChange() {
+/* 滑块读数（vCtx/vConc）是纯文本赋值，极廉价，每次 input 都即时更新保证跟手；
+   真正的重活（analyze + 重建 47 张货架 + 整段 SVG innerHTML + 状态条）收在 onChange 里。 */
+function updateSliderLabels() {
   document.getElementById('vCtx').textContent = (+document.getElementById('sCtx').value) + 'K';
   document.getElementById('vConc').textContent = document.getElementById('sConc').value + L(' 路','');
+}
+function onChange() {
+  updateSliderLabels();
   const st = settings();
   const a = P.analyze(build, st);
   renderShelves();
@@ -575,7 +580,22 @@ function onChange() {
   if (window.updateStatus) updateStatus(a, st);
 }
 window.isView3d = () => view3d;
-document.querySelectorAll('#strataBar select,#strataBar input').forEach(el => el.addEventListener('input', onChange));
+/* 下拉框（型号/思考强度）：一次操作只触发一次 input，直接全量刷新。
+ * 滑块（上下文/并发）：拖动时每帧都触发 input，若逐次跑 onChange，
+ * 一帧内要做 analyze + 47 张货架重建 + 整段 SVG innerHTML + 3D 线缆重建，
+ * 拖动明显掉帧。这里拆成：读数跟手即时更新；重渲染 120ms 节流；
+ * 松手（change）再立即补一次终值，保证最终状态精确。 */
+function scheduleHeavy() {
+  const now = performance.now();
+  const wait = Math.max(0, 120 - (now - (scheduleHeavy._at || 0)));
+  clearTimeout(scheduleHeavy._t);
+  scheduleHeavy._t = setTimeout(() => { scheduleHeavy._at = performance.now(); onChange(); }, wait);
+}
+document.querySelectorAll('#strataBar select,#strataBar input[type=checkbox]').forEach(el => el.addEventListener('input', onChange));
+document.querySelectorAll('#strataBar input[type=range]').forEach(el => {
+  el.addEventListener('input', () => { updateSliderLabels(); scheduleHeavy(); });
+  el.addEventListener('change', () => { clearTimeout(scheduleHeavy._t); onChange(); });
+});
 
 /* 初始化权重下拉 */
 P.models.forEach(m => {
