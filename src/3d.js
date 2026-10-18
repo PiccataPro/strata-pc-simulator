@@ -13,6 +13,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { PANEL_NORMAL_PNG, PANEL_ROUGH_PNG } from './texdata.js';
+import { GPU_SHROUD_PNG, MOBO_PCB_PNG, CPU_IHS_PNG, FAN_HUB_PNG } from './texdata2.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 const P = window.STRATA_PARTS;
@@ -128,6 +129,23 @@ function initMaterials() {
   M.__panelN = loadTex(PANEL_NORMAL_PNG, 4);
   M.__panelR = loadTex(PANEL_ROUGH_PNG, 4);
   M.__grain = texGrainNormal(256, 22, 3.4, 7);
+  /* pc53 写实产品贴图（texdata2.js，铭铭验收）：整张贴到单个面上，
+     ClampToEdge 防边缘拉伸，sRGB 色彩空间。审计/Node 环境无 Image → null，
+     材质退回原程序化外观，几何不受影响。 */
+  const loadDecal = url => {
+    if (texOff || typeof Image === 'undefined' || !url) return null;
+    try {
+      const t = new THREE.TextureLoader().load(url);
+      t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.anisotropy = 8;
+      return t;
+    } catch (e) { return null; }
+  };
+  M.__moboPcb = loadDecal(MOBO_PCB_PNG);
+  M.__cpuIhs = loadDecal(CPU_IHS_PNG);
+  M.__gpuShroud = loadDecal(GPU_SHROUD_PNG);
+  M.__fanHub = loadDecal(FAN_HUB_PNG);
   const grain = (mat, mm, ns) => {
     const t = M.__grain.clone();
     t.needsUpdate = true;
@@ -178,6 +196,9 @@ function initMaterials() {
      两层相乘后接近纯黑，和机箱内壁糊成一片。改成 color=白，让贴图本色直接出来，
      取偏蓝的深板岩灰，和机箱的 #171c26/#2a3140 拉开明度。 */
   M.pcbMobo = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.62, map: texCircuit(256, 256, '#39434f', '#57a985') });
+  /* pc53 写实 PCB 贴图替换程序化电路底图（走线/过孔/丝印/安装孔更真实）。
+     只换板面底图，PCIe 槽的 frac 彩色标识与型号丝印仍叠加在上面，玩法信息不丢。 */
+  if (M.__moboPcb) M.pcbMobo.map = M.__moboPcb;
   M.pcbGpu = new THREE.MeshStandardMaterial({ color: 0x131518, roughness: 0.6, map: texCircuit(256, 256, '#131518', '#2a4a44') });
   M.pcbRam = new THREE.MeshStandardMaterial({ color: 0x16181c, roughness: 0.58, map: texCircuit(256, 256, '#16181c', '#6d4a8c') });
   M.alu = new THREE.MeshStandardMaterial({ color: 0x9aa4b2, metalness: 0.9, roughness: 0.3, map: texBrushed('#9aa4b2') });
@@ -255,6 +276,20 @@ function decalTex(main, sub, opts) {
   t.anisotropy = 4;
   return t;
 }
+/* 整张写实贴图贴到单个面：MeshStandard（吃光照/金属度），透明贴图自动带 alpha。
+   polygonOffset 防与母面 z-fighting；偏移 0.3mm 由调用方给。 */
+function texPlane(w, h, tex, x, y, z, rot, opts) {
+  const o = opts || {};
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({
+    map: tex, transparent: true, depthWrite: false,
+    roughness: o.rough != null ? o.rough : 0.55, metalness: o.metal != null ? o.metal : 0.15,
+    polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+  }));
+  m.position.set(x, y, z);
+  if (rot) m.rotation.set(rot[0] || 0, rot[1] || 0, rot[2] || 0);
+  m.userData.noShadow = true;
+  return m;
+}
 /* w/h 单位 mm；ry=π/2 时面朝 +X（从侧透看过去正读） */
 function decalPlane(w, h, tex, x, y, z, ry) {
   const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({
@@ -281,6 +316,17 @@ function makeFan(size, color, opts = {}) {
   });
   const imp = new THREE.Group(); imp.position.y = t * 0.2;
   const hub = cyl(size * 0.16, t * 0.8, M.aluDark, 20); imp.add(hub);
+  /* pc53 写实轮毂贴纸：贴在叶轮中心朝下的一面，随扇叶一起转（真风扇轴心贴纸就是转的）。
+     只取源图中心的金属拉丝圆标，不取整张风扇图——整张会和 3D 扇叶双重绘制打架。 */
+  if (M.__fanHub) {
+    const hd = new THREE.Mesh(new THREE.PlaneGeometry(size * 0.3, size * 0.3), new THREE.MeshStandardMaterial({
+      map: M.__fanHub, transparent: true, depthWrite: false, roughness: 0.32, metalness: 0.65,
+    }));
+    hd.rotation.x = Math.PI / 2;   // 法线朝 -Y（从下方/侧透看得到）
+    hd.position.y = -t * 0.45;     // 轮毂底面外侧 0.5mm
+    hd.userData.noShadow = true;
+    imp.add(hd);
+  }
   const bladeGeo = new THREE.BoxGeometry(size * 0.36, t * 0.28, size * 0.14);
   bladeGeo.translate(size * 0.24, 0, 0);
   bladeGeo.rotateY(0.6);
@@ -594,6 +640,10 @@ function buildCPU(c) {
   const g = new THREE.Group();
   g.add(box(2, L.cpu.s, L.cpu.s, M.pcbGpu, 4.5, L.cpu.y, L.cpu.z));
   const ihs = box(3.5, L.cpu.s - 12, L.cpu.s - 8, M.nickel, 6.5, L.cpu.y, L.cpu.z); g.add(ihs);
+  /* pc53 写实 IHS 顶盖贴图：贴 +X 面（侧透可见面），镀镍拉丝+蚀刻型号。
+     装了散热器时被冷头/塔体遮住，和真机一致。 */
+  if (M.__cpuIhs) g.add(texPlane(L.cpu.s - 8, L.cpu.s - 12, M.__cpuIhs, 8.55, L.cpu.y, L.cpu.z,
+    [0, Math.PI / 2, 0], { metal: 0.9, rough: 0.25 }));
   g.userData.anchor = [5.5, L.cpu.y, L.cpu.z];
   g.userData.fitBox = { x: 6, y: L.cpu.s, z: L.cpu.s };
   return g;
@@ -705,6 +755,10 @@ function buildGPU(gpu, assign, i) {
    * 于是挡板横穿机箱、风扇圆心落在托盘里、卡体只有 30mm 厚却堆了 98mm 高。 */
   g.add(box(HGT - 8, 1.6, len - 14, M.pcbGpu, xc, slotY, zc));                        // PCB
   g.add(box(HGT - 12, th - 12, len - 22, M.gpuBody, xc, botY + 12 + (th - 12) / 2, zc)); // 散热罩（中性灰塑料）
+  /* pc53 写实导风罩贴图：贴在散热罩底面（风扇安装面），三圆口透出真实 3D 风扇。
+     贴图已裁掉挡板/金手指、RGB 灯带朝向卡顶前缘（与 Gaming X Slim 实物一致）。 */
+  if (M.__gpuShroud) g.add(texPlane(HGT - 12, len - 22, M.__gpuShroud, xc, botY + 11.7, zc,
+    [Math.PI / 2, 0, 0], { metal: 0.35, rough: 0.5 }));
   g.add(box(HGT - 16, 1.5, len - 18, M.alu, xc, slotY + 2.3, zc));                    // 背板
   // 挡板（XY 平面，贴尾部墙面）
   g.add(box(HGT, th + 10, 2, M.steel, xc, slotY - th / 2 + 5, zR + 3));
@@ -1554,4 +1608,12 @@ window.STRATA_3D = { init, sync, setPhase, setTelemetry, toggleDoor, resetView, 
     camera: ready ? camera.position.toArray().map(v => Math.round(v)) : null,
     target: ready ? controls.target.toArray().map(v => Math.round(v)) : null,
     canvas: renderer ? [renderer.domElement.width, renderer.domElement.height] : null,
+    /* pc53 写实贴图状态（探针 scripts/probe_tex.js 用）：
+       loaded=对象存在，img=图片已解码，inScene=场景里有多少网格正在用它。
+       inScene>0 才证明贴图真的贴到了部件上（不只是加载了）。 */
+    tex: (() => {
+      const count = t => { if (!t) return 0; let n = 0; scene.traverse(o => { if (o.isMesh && o.material && o.material.map === t) n++; }); return n; };
+      const st = t => ({ loaded: !!t, img: !!(t && t.image && t.image.complete), inScene: count(t) });
+      return { moboPcb: st(M.__moboPcb), cpuIhs: st(M.__cpuIhs), gpuShroud: st(M.__gpuShroud), fanHub: st(M.__fanHub) };
+    })(),
   }) };
