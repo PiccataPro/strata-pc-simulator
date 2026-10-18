@@ -14,6 +14,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { PANEL_NORMAL_PNG, PANEL_ROUGH_PNG } from './texdata.js';
 import { GPU_SHROUD_PNG, MOBO_PCB_PNG, CPU_IHS_PNG, FAN_HUB_PNG } from './texdata2.js';
+import { RAM_ARMOR_BLACK_PNG, RAM_ARMOR_WHITE_PNG, COOLER_TOP_PNG, AIO_PUMP_PNG, PSU_LABEL_PNG, CASE_SHROUD_PNG } from './texdata3.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 const P = window.STRATA_PARTS;
@@ -146,6 +147,13 @@ function initMaterials() {
   M.__cpuIhs = loadDecal(CPU_IHS_PNG);
   M.__gpuShroud = loadDecal(GPU_SHROUD_PNG);
   M.__fanHub = loadDecal(FAN_HUB_PNG);
+  /* 第二批写实贴图（texdata3.js）：内存马甲/塔顶盖/泵顶/电源铭牌格栅/机箱遮罩 */
+  M.__ramBlack = loadDecal(RAM_ARMOR_BLACK_PNG);
+  M.__ramWhite = loadDecal(RAM_ARMOR_WHITE_PNG);
+  M.__coolerTop = loadDecal(COOLER_TOP_PNG);
+  M.__aioPump = loadDecal(AIO_PUMP_PNG);
+  M.__psuLabel = loadDecal(PSU_LABEL_PNG);
+  M.__caseShroud = loadDecal(CASE_SHROUD_PNG);
   const grain = (mat, mm, ns) => {
     const t = M.__grain.clone();
     t.needsUpdate = true;
@@ -427,6 +435,9 @@ function attachGLB(grp, cat, id) {
     grp.children.slice().forEach(ch => { ch.visible = false; });
     grp.add(wrap);
     grp.userData.glbWrapped = wrap;
+    /* GLB 加载完成后再追加「装饰贴图」（如电源铭牌）：这些面片不属于程序化几何，
+       不能被上面的 visible=false 隐藏，所以挂在 GLB 之后、按世界坐标浮在观察窗一侧。 */
+    if (grp.userData.postGlbDecal) grp.userData.postGlbDecal();
   });
 }
 
@@ -534,6 +545,10 @@ function buildCasePart(kase) {
   // 电源仓罩（跟着电源一起挪到 Z 尾部侧）
   const sh = box(W - 14, 4, L.psuShroud.z, M.shroud, (W - 14) / 2 + 4, L.psuShroud.h, D - L.psuShroud.z / 2);
   g.add(sh);
+  /* 写实遮罩贴花（pc53 正交生成：STRATA logo 拉丝面板，铭铭验收）：贴仓罩顶面前部露出区
+     （z 150…230，显卡前缘之前，从侧透看得到）。logo 横向沿 X，rot=[-π/2,0,0] 躺平法线 +Y。 */
+  if (M.__caseShroud) g.add(texPlane(150, 70, M.__caseShroud, (W - 14) / 2 + 4, L.psuShroud.h + 2.4, 190,
+    [-Math.PI / 2, 0, 0], { metal: 0.6, rough: 0.4 }));
   /* 电源仓侧板：改成「四条框 + 中间玻璃观察窗」。
      窗洞 z 200…410（正对电源本体 232…444）、y 12…78，四周留 40/10/12 的框边。 */
   const shX = W - 12, shZ0 = D - L.psuShroud.z;   // 侧板所在 x=198，罩体起点 z=140
@@ -655,6 +670,9 @@ function buildCooler(co) {
     const head = cyl(32, 24, M.aluDark, 28); head.rotation.z = Math.PI / 2; head.position.set(20, L.cpu.y, L.cpu.z); g.add(head);
     const ring = new THREE.Mesh(new THREE.TorusGeometry(26, 2.5, 8, 40), M.emissive(0x3fb6ff, 2));
     ring.rotation.y = Math.PI / 2; ring.position.set(33, L.cpu.y, L.cpu.z); g.add(ring); rgbs.push({ mat: ring.material, hue: 0.55 });
+    /* 写实泵顶贴图（pc53 正交俯视图：圆形金属泵盖+中心镜面logo）：贴冷头 +X 圆面（侧透可见）。
+       冷头半径 32，贴图取直径 ~58 的圆面，rot=[0,π/2,0] 让圆面法线朝 +X。 */
+    if (M.__aioPump) g.add(texPlane(58, 58, M.__aioPump, 32.6, L.cpu.y, L.cpu.z, [0, Math.PI / 2, 0], { metal: 0.7, rough: 0.35 }));
     /* 顶部冷排：380mm 居中放在 z=250（占 60…440），尾部对齐后不会顶穿端面。 */
     const rad = box(70, 28, 380, M.steelDark, L.caseIn.w / 2, L.topY - 16, 250); g.add(rad);
     for (let i = 0; i < 3; i++) {
@@ -685,8 +703,13 @@ function buildCooler(co) {
     const cz = L.cpu.z - (nT === 2 ? 8 : 4);
     for (let t = 0; t < nT; t++) {
       const f = fins(nFin, finX, towerH, 5, 1.2, M.alu);
-      f.position.set(14 + finX / 2, L.cpu.y + 40, cz - (nT === 1 ? 0 : (t - 0.5) * (depth + 20)));
+      const tz = cz - (nT === 1 ? 0 : (t - 0.5) * (depth + 20));
+      f.position.set(14 + finX / 2, L.cpu.y + 40, tz);
       g.add(f);
+      /* 写实塔顶盖贴图（pc53 正交俯视图：镀镍顶板+蚀刻logo+四角螺丝）：贴塔体顶面（法线 +Y）。
+         只取贴图中心顶板区，避免与 3D 鳍片双重绘制——裁掉源图两侧鳍片列。 */
+      if (M.__coolerTop) g.add(texPlane(finX - 14, depth - 14, M.__coolerTop,
+        14 + finX / 2, L.cpu.y + 40 + towerH / 2 + 0.4, tz, [-Math.PI / 2, 0, 0], { metal: 0.85, rough: 0.3 }));
     }
     // 风扇正对塔体吹（轴向沿 Z）。原来绕 Z 转了 90°，变成朝侧透吹
     const fan = makeFan(fanD, 0x7fd1ff);
@@ -724,6 +747,14 @@ function buildDIMM(d, i) {
   /* 顶部 RGB 导光条：沿 Y 铺在离板最远的那条边上 */
   const bar = rgbBar(4, L.dimm.h - 16, 6, (i * 0.13) % 1);
   bar.position.set(X0 + HGT - 2, yc, z); g.add(bar);
+  /* 写实马甲贴图（Kingston FURY Beast 官方正侧视图，黑/白按套条）：贴马甲 ±Z 大面。
+     贴图已 CW 转 90°：长边（金手指长度）沿 v、金手指落 u=0。马甲面 27(X)×125(Y)。
+     后脸(+Z) rot=0 使金手指(u=0)落在靠主板侧(低X)；前脸(-Z) 绕 Y 翻 180°。 */
+  const ramTex = white ? M.__ramWhite : M.__ramBlack;
+  if (ramTex) {
+    g.add(texPlane(27, 125, ramTex, X0 + HGT / 2, yc, z + 3.0, [0, 0, 0], { metal: 0.5, rough: 0.42 }));
+    g.add(texPlane(27, 125, ramTex, X0 + HGT / 2, yc, z - 3.0, [0, Math.PI, 0], { metal: 0.5, rough: 0.42 }));
+  }
   return g;
 }
 
@@ -824,13 +855,16 @@ function buildPSU(p) {
   const zR = L.caseIn.d - 6;          // 电源接口朝向尾部（Z=444）
   g.add(box(150, 85, len, M.steelDark, 95, y, zR - len / 2));
   g.add(box(60, 2, 40, M.emissive(0xffd166, 0.9), 95, 84, zR - 40)); // 标签灯
-  /* 侧脸（朝 +X，正对电源仓观察窗）：铭牌贴纸 + 一列模组接口，
-     不然从窗口看进去只有一个纯黑的铁盒子，看不出是电源。 */
-  g.add(box(0.8, 30, 84, M.emissive(0xc8d8e8, 0.22), 170.4, y + 6, zR - len / 2));       // 铭牌
-  g.add(box(0.9, 4, 44, M.black, 170.5, y + 16, zR - len / 2));                            // 铭牌上的黑色标题条
-  /* 铭牌贴花：型号 + 瓦数，透过电源仓观察窗能看到 */
-  g.add(decalPlane(70, 22, decalTex(p.name, p.w + 'W · 80PLUS GOLD', { w: 512, h: 160, color: '#dfe8f4' }),
-    171.1, y + 4, zR - len / 2, Math.PI / 2));
+  /* 侧脸（朝 +X，正对电源仓观察窗）：写实铭牌 + 一列模组接口。
+     铭牌用 pc53 正交生成图（AX1200i 帆船 logo + 规格表 + 四角螺丝，铭铭验收），
+     替换旧的文字贴花。程序化版直接挂；GLB 版由 postGlbDecal 在白模加载后补挂
+     ——attachGLB 会把程序化子件整组 visible=false，直接挂会被一起藏掉。 */
+  const addLabel = () => {
+    if (M.__psuLabel) g.add(texPlane(150, 75, M.__psuLabel, 170.8, y + 2, zR - len / 2,
+      [0, Math.PI / 2, 0], { metal: 0.3, rough: 0.55 }));
+  };
+  addLabel();
+  g.userData.postGlbDecal = addLabel;
   for (let i = 0; i < 4; i++) g.add(box(0.8, 9, 15, M.black, 170.5, y - 20, zR - 34 - i * 19)); // 模组接口
   g.userData.anchor = [95, y, zR - len / 2];
   g.userData.fitBox = { x: 150, y: 85, z: len };
@@ -1614,6 +1648,8 @@ window.STRATA_3D = { init, sync, setPhase, setTelemetry, toggleDoor, resetView, 
     tex: (() => {
       const count = t => { if (!t) return 0; let n = 0; scene.traverse(o => { if (o.isMesh && o.material && o.material.map === t) n++; }); return n; };
       const st = t => ({ loaded: !!t, img: !!(t && t.image && t.image.complete), inScene: count(t) });
-      return { moboPcb: st(M.__moboPcb), cpuIhs: st(M.__cpuIhs), gpuShroud: st(M.__gpuShroud), fanHub: st(M.__fanHub) };
+      return { moboPcb: st(M.__moboPcb), cpuIhs: st(M.__cpuIhs), gpuShroud: st(M.__gpuShroud), fanHub: st(M.__fanHub),
+        ramBlack: st(M.__ramBlack), ramWhite: st(M.__ramWhite), coolerTop: st(M.__coolerTop), aioPump: st(M.__aioPump),
+        psuLabel: st(M.__psuLabel), caseShroud: st(M.__caseShroud) };
     })(),
   }) };

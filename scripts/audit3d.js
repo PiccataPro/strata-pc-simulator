@@ -28,7 +28,10 @@ const EXPOSE = [
   'L', 'M', 'initMaterials', 'THREE', 'DOOR_HINGE_FRONT', 'DOOR_SWING',
 ];
 let src = fs.readFileSync(path.join(srcDir, '3d.js'), 'utf8');
-src = src.replace("from './texdata.js'", "from '" + path.join(srcDir, 'texdata.js').replace(/\\/g, '/') + "'");
+/* 把 './texdata*.js' 的相对 import 改写成绝对路径——entry 在临时目录，
+   相对路径会相对临时目录解析而找不到（texdata2/3 引入后此脚本即坏，现补全）。 */
+src = src.replace(/from '\.\/(texdata\d*\.js)'/g,
+  (m, f) => "from '" + path.join(srcDir, f).replace(/\\/g, '/') + "'");
 src += '\nwindow.__AUDIT = { ' + EXPOSE.join(', ') + ' };\n';
 const entry = path.join(tmpDir, '3d-audit.js');
 fs.writeFileSync(entry, src);

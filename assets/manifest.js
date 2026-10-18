@@ -17,12 +17,15 @@ window.STRATA_ASSETS = {
    * 只覆盖"无动画依赖"的类别（显卡/CPU/电源）：主板 PCIe 槽 frac 色条、
    * 内存 RGB 呼吸、散热风扇旋转是模拟器教学动画核心，保留程序化建模。 */
   parts: {
-    /* 显卡白模按旧版（错误）朝向标定：旧版把卡厚当 X、卡高当 Y，缩放盒是 34×60×309。
-       现在 3d.js 的程序化显卡已按真实朝向重建（112 高×厚×长，且过 npm run audit 校验），
-       白模套进去会被拉歪。要启用就去掉 noGlb，并按新 fitBox(112 × th × len) 重新标定模型。 */
-    'rtx-3080-20g': { noGlb: true },
-    'rtx-3080-10g': { noGlb: true },
-    'rtx-4070s':    { noGlb: true },
+    /* 显卡白模朝向重标定（2026-10-18，glb_out/calib_gpu.mjs 实测）：
+       白模原始轴 = X 卡长 / Y 厚度 / Z 卡高，绕 Y 转 90°（rot=[0,π/2,0]）后
+       最长边→Z(卡长)、次长→X(卡高)、最短→Y(厚度)，与 fitBox(HGT×th×len) 对齐，
+       三轴缩放比接近真实卡比例（4070S 长/高=2.0 vs 真卡 2.31），不会拉歪。
+       注意：白模无贴图，启用后替换程序化显卡（含导风罩贴图+旋转风扇），
+       是否更真实以 scripts/shot.js 截图实测为准。 */
+    'rtx-3080-20g': { glb: 'gpu_rtx3080_20g.glb', rot: [0, Math.PI / 2, 0] },
+    'rtx-3080-10g': { noGlb: true },   // 无对应白模文件，保持程序化
+    'rtx-4070s':    { glb: 'gpu_rtx4070s.glb', rot: [0, Math.PI / 2, 0] },
     'i7-14700':     { glb: 'cpu_lga1700.glb' },
     'i7-12700KF':   { glb: 'cpu_lga1700.glb' },
     'psu-1250t':    { glb: 'psu_atx.glb' },
