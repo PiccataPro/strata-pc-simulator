@@ -803,6 +803,9 @@ const GPU_HGT = {
   'rtx-3060-12g': 112, 'rtx-3070-8g': 112, 'rtx-4060ti-16g': 115, 'rtx-4070': 115,
   'rtx-4070tis': 137, 'rtx-4080s': 137, 'rtx-5070': 114, 'rtx-5070tis': 130, 'rtx-5080': 130,
   'rx-6750xt-12g': 115, 'rx-7600-8g': 110, 'rx-7800xt-16g': 115, 'rx-7900xtx-24g': 110, 'rx-9070xt-16g': 130,
+  /* 2026-10-19 二批扩库新增（FE/公版官方三围：5060 242×112×48、5060Ti 250×112×48、
+     9060XT 267×110×40、9070 287×110×50，mm） */
+  'rtx-5060-8g': 112, 'rtx-5060ti-16g': 112, 'rx-9060xt-16g': 110, 'rx-9070-16g': 110,
 };
 function buildGPU(gpu, assign, i) {
   const g = new THREE.Group();
@@ -965,6 +968,9 @@ function init(el) {
   controls = new OrbitControls(camera, renderer.domElement);
   controls.target.set(100, 240, 230); controls.enableDamping = true; controls.dampingFactor = 0.08;
   controls.maxDistance = 1800; controls.minDistance = 120;
+  /* FPS 手感（铭铭 2026-10-19）：右键按住拖动 = 转视角（和左键空处拖动手感一致），
+     中键 = 平移。OrbitControls 默认右键是 PAN，和「右键按住看方向」的肌肉记忆冲突。 */
+  controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.ROTATE };
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
   scene.add(new THREE.HemisphereLight(0x99aacc, 0x334455, 1.1));
@@ -990,6 +996,7 @@ function init(el) {
   resize();
   new ResizeObserver(resize).observe(el);
   bindPointer();
+  bindKeys();
   loadBackdrop();
   ready = true;
   requestAnimationFrame(loop);
@@ -1379,6 +1386,7 @@ function loop(ts) {
     dp.obj.quaternion.slerpQuaternions(dp.fromR, dp.toR, e);
     if (k >= 1) deskPlace = null;
   }
+  applyFly(dt);
   controls.update();
   composer.render();
 }
@@ -1404,6 +1412,17 @@ let pendingFree = null;              // 刚甩到桌面的 {cat,id,pose}，等 s
 let deskPlace = null;                // 落桌/回弹补间 {obj, t, dur, fromP, toP, fromR, toR, onEnd}
 const _rayPlane = new THREE.Plane(), _hitPt = new THREE.Vector3();
 const _fdDir = new THREE.Vector3(), _fdUp = new THREE.Vector3(), _fdRight = new THREE.Vector3();
+const _spinC0 = new THREE.Vector3(), _spinC1 = new THREE.Vector3();
+/* 原地自转（铭铭 2026-10-19：旋转半径太大像甩大风车）：
+   部件组的原点常在插槽/金手指处，rotateOnWorldAxis 会让几何绕原点甩大圈。
+   这里转完后把位置反向补偿回包围盒中心 → 视觉上就是绕自身中心小半径自转。 */
+function spinInPlace(obj, axis, ang) {
+  new THREE.Box3().setFromObject(obj).getCenter(_spinC0);
+  obj.rotateOnWorldAxis(axis, ang);
+  obj.updateMatrixWorld(true);
+  new THREE.Box3().setFromObject(obj).getCenter(_spinC1);
+  obj.position.add(_spinC0.sub(_spinC1));
+}
 
 /* 开始自由拖拽：以抓取点建一个垂直相机视线的平面，之后光标射线与该平面的交点 = 物体新家。
    抓取瞬间沿相机 up 抬 25mm + 放大 5% = 「弹出脱离装配位」的手感。 */
@@ -1473,6 +1492,9 @@ function bindPointer() {
     const r = el.getBoundingClientRect();
     ptr.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1);
 
+    /* 右键（button 2）= FPS 转向：即使按在配件上也一律让给 OrbitControls，
+       绝不进自由拖拽——否则拖到零件上视角就死了（铭铭 2026-10-19 需求）。 */
+    if (down && down.button === 2) return;
     if (down && down.obj && !down.onDoor && !dragging && !freeDrag &&
       Math.hypot(e.clientX - down.x, e.clientY - down.y) > 10) {
       /* 画布内拖配件 → 自由拖拽（弹出/跟随/落桌）；拖出画布 → 老规矩拆件。
@@ -1523,7 +1545,7 @@ function bindPointer() {
     const obj = hitObj ? rootPick(hitObj) : null;
     const spareUid = spareHitUid();
     down = {
-      x: e.clientX, y: e.clientY,
+      x: e.clientX, y: e.clientY, button: e.button,
       obj: obj || (spareUid && spareObjs.get(spareUid) ? spareObjs.get(spareUid).group : null),  // 台面备用件也能抓起来玩
       onDoor: hitObj ? isDoorNode(hitObj) : false,   // 命中的是玻璃侧盖 → 点击=开关门
       spare: spareUid,                               // 命中的是台面备用件 → 点击=装回机箱
@@ -1537,6 +1559,8 @@ function bindPointer() {
     controls.enabled = true;
     el.style.cursor = 'default';
     if (!down) return;
+    /* 右键只做视角操作：抬起不弹窗、不装回、不拆除 */
+    if (down.button === 2) { down = null; dragging = false; return; }
     if (freeDrag) { endFreeDrag(); down = null; dragging = false; return; }
     const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y);
     if (!dragging && moved <= 6 && down.spare) {
@@ -1578,9 +1602,9 @@ function bindPointer() {
     const k = e.deltaY * 0.0035;
     if (e.shiftKey) {
       _fdRight.set(1, 0, 0).applyQuaternion(camera.quaternion);
-      freeDrag.obj.rotateOnWorldAxis(_fdRight, k);
+      spinInPlace(freeDrag.obj, _fdRight, k);
     } else {
-      freeDrag.obj.rotateOnWorldAxis(_fdUp.set(0, 1, 0), k);
+      spinInPlace(freeDrag.obj, _fdUp.set(0, 1, 0), k);
     }
   }, { capture: true, passive: false });
   /* 指针被系统取消（切窗口、触控中断、capture 丢失）时 pointerup 不会触发。
@@ -1593,6 +1617,46 @@ function bindPointer() {
     if (dragging && down && down.obj) sync(build_ref, analyze_ref);
     down = null; dragging = false; controls.enabled = true; el.style.cursor = 'default';
   });
+}
+
+/* ---- FPS 式键盘漫游（铭铭 2026-10-19）：WASD 沿视线水平面前后左右，Q/E 或 Space/ShiftX 升降。
+   相机与 target 一起平移（= 平移整个轨道），不影响右键转向。
+   速度随视距缩放：拉远了走得快、贴脸了走得慢，和 DCC 软件口径一致。 ---- */
+const keysDown = new Set();
+function bindKeys() {
+  window.addEventListener('keydown', e => {
+    if (e.repeat) return;
+    const t = e.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+    const c = e.code;
+    if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'Space'].includes(c)) {
+      keysDown.add(c);
+      if (c === 'Space') e.preventDefault();   // 防滚动页面
+    }
+  });
+  window.addEventListener('keyup', e => keysDown.delete(e.code));
+  window.addEventListener('blur', () => keysDown.clear());   // 切窗口防按键卡住
+}
+const _mvF = new THREE.Vector3(), _mvR = new THREE.Vector3(), _mv = new THREE.Vector3();
+function applyFly(dt) {
+  if (!keysDown.size || freeDrag) return;
+  camera.getWorldDirection(_mvF); _mvF.y = 0;
+  if (_mvF.lengthSq() < 1e-6) _mvF.set(0, 0, -1);            // 俯视正下方时给个兜底前向
+  _mvF.normalize();
+  _mvR.crossVectors(_mvF, new THREE.Vector3(0, 1, 0));        // 右手侧向
+  const dist = camera.position.distanceTo(controls.target);
+  const v = Math.max(120, Math.min(900, dist * 0.9)) * dt;    // mm/s，随视距
+  _mv.set(0, 0, 0);
+  if (keysDown.has('KeyW')) _mv.add(_mvF);
+  if (keysDown.has('KeyS')) _mv.sub(_mvF);
+  if (keysDown.has('KeyD')) _mv.add(_mvR);
+  if (keysDown.has('KeyA')) _mv.sub(_mvR);
+  if (keysDown.has('KeyE') || keysDown.has('Space')) _mv.y += 1;
+  if (keysDown.has('KeyQ') || (keysDown.has('ShiftLeft') && !keysDown.has('Space'))) _mv.y -= 1;
+  if (_mv.lengthSq() === 0) return;
+  _mv.normalize().multiplyScalar(v);
+  camera.position.add(_mv);
+  controls.target.add(_mv);
 }
 function rootPick(o) { while (o) { if (o.userData && o.userData.pick) return o; o = o.parent; } return null; }
 /* 命中的网格是否属于玻璃侧盖（门组带 userData.isDoor 标记） */
@@ -1897,12 +1961,23 @@ window.STRATA_3D = { init, sync, setPhase, setTelemetry, toggleDoor, resetView, 
     return any;
   },
   toast: toast3d, hidePickPop,
+  /* 探针专用（probe_random.cjs）：读当前自由拖拽件的包围盒中心+对角线，验证小半径自转 */
+  spinProbe: () => {
+    if (!freeDrag) return { ok: false };
+    const bb = new THREE.Box3().setFromObject(freeDrag.obj);
+    const c = bb.getCenter(new THREE.Vector3());
+    return { ok: true, c: c.toArray(), diag: bb.getSize(new THREE.Vector3()).length() };
+  },
   onRemove: cb => removeCb = cb,
   onSpareDelete: cb => spareDelCb = cb,
   onSpareInstall: cb => spareInstallCb = cb,
   /* 无头验证探针：装配件清单 + GLB 命中数 */
   debugState: () => ({
-    installed: [...installed.values()].map(v => ({ cat: v.cat, idx: v.idx, id: v.id, glb: !!(v.group.userData && v.group.userData.glbWrapped) })),
+    installed: [...installed.values()].map(v => {
+      let center = null;
+      try { center = new THREE.Box3().setFromObject(v.group).getCenter(new THREE.Vector3()).toArray().map(Math.round); } catch (e) { }
+      return { cat: v.cat, idx: v.idx, id: v.id, center, glb: !!(v.group.userData && v.group.userData.glbWrapped) };
+    }),
     glb: glbStats, phase, ready,
     /* 自由拖拽探针用：台面上备用件数 + 用户自由摆放数 + 是否正在拖 */
     spareCount: spareObjs.size, freeCount: freePose.size, draggingFree: !!freeDrag,

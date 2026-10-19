@@ -614,6 +614,7 @@ document.getElementById('btnView').addEventListener('click', toggleView);
     view3d = !view3d; applyView();
   });
 });
+document.getElementById('btnRandom').addEventListener('click', () => randomBuild());
 document.getElementById('btnDoor').addEventListener('click', () => window.STRATA_3D && window.STRATA_3D.toggleDoor());
 document.getElementById('btnReset').addEventListener('click', () => window.STRATA_3D && window.STRATA_3D.resetView());
 /* 模块是异步加载的：等 load 之后再看一眼 STRATA_3D 在不在，不在就把按钮标灰。 */
@@ -673,6 +674,70 @@ P.models.forEach(m => {
   document.getElementById('sModel').appendChild(o);
 });
 document.getElementById('sModel').value = 'ud_q4';
+
+/* ---- 随机组装（铭铭 2026-10-19）：随机配一套「真实可点亮」的机器。
+ * 不是纯随机撒零件——按真实兼容链来选：平台 → CPU → 同插槽同代内存主板 →
+ * 装得下板型的机箱 → 对称双通道内存 → 机箱限长内的显卡 → 瓦数/16pin 够的电源 →
+ * 压得住 PL2 的散热 → NVMe 起步。每套候选最后还要过一遍 P.analyze，
+ * canPost 才采用（80 次配不出来就放弃本次点击，绝不装一套点不亮的机器）。 ---- */
+const randPick = arr => arr[(Math.random() * arr.length) | 0];
+const FORM_RANK = { ITX: 0, 'mATX': 1, mATX: 1, ATX: 2, 'E-ATX': 3 };
+function tryRandomCombo() {
+  /* 消费级平台高权重：TRX4/SP3 配件池小，抽到就抽，抽不到重试 */
+  const cpu = randPick(P.cpus.filter(c => c.platform === randPick(
+    ['LGA1700', 'LGA1700', 'AM5', 'AM5', 'AM4', 'AM4', 'AM4', 'TRX4', 'SP3'])));
+  const mobo = randPick(P.mobos.filter(m => m.socket === cpu.socket && cpu.ddr.includes(m.ddr) && m.form !== 'E-ATX'));
+  if (!mobo) return null;
+  const kase = randPick(P.cases.filter(c => (FORM_RANK[c.formMax] ?? 2) >= (FORM_RANK[mobo.form] ?? 1)));
+  if (!kase) return null;
+  /* 内存：同 SKU 两条对称双通道（gen=主板、CPU 支持、RECC 只给服务器板） */
+  const pool = P.dimms.filter(d => d.gen === mobo.ddr && cpu.ddr.includes(d.gen) && (!d.ecc || mobo.eccOK));
+  if (!pool.length) return null;
+  const bySize = {}; pool.forEach(d => (bySize[d.size] = bySize[d.size] || []).push(d));
+  const d0 = randPick(bySize[randPick(Object.keys(bySize))]);
+  const chan = mobo.memChan || Array.from({ length: mobo.memSlots }, (_, i) => String.fromCharCode(65 + Math.floor(i / 2)));
+  let i2 = -1; for (let i = 1; i < chan.length; i++) if (chan[i] !== chan[0]) { i2 = i; break; }
+  if (i2 < 0) return null;
+  const ram = Array(mobo.memSlots).fill(null); ram[0] = d0.id; ram[i2] = d0.id;
+  /* 显卡：机箱限长内；25% 概率双卡（同型号，槽距/供电交给 analyze 把关） */
+  const gp = P.gpus.filter(g => g.len <= kase.gpuMaxLen);
+  if (!gp.length) return null;
+  const g1 = randPick(gp), dual = Math.random() < 0.25 && mobo.slots.length >= 2;
+  const gpu = dual ? [g1.id, g1.id] : [g1.id];
+  /* 电源：留 30% 余量（避开「余量偏紧」警告线），原生 16pin 数够双卡 */
+  const load = 150 + cpu.tdp + g1.tdp * gpu.length;
+  const need16 = (/16pin|12pin/.test(g1.conn) ? gpu.length : 0);
+  const psu = randPick(P.psus.filter(p => p.w >= load / 0.7 && p.conn16pin >= need16));
+  if (!psu) return null;
+  /* 散热：解热 ≥ CPU PL2（analyze 里是警告，这里直接按严格标准选掉） */
+  const cooler = randPick(P.coolers.filter(c => c.cap >= (cpu.pl2 || cpu.tdp)));
+  if (!cooler) return null;
+  /* 存储：至少一块 NVMe（权重盘），40% 概率加第二块 */
+  const nvme = P.ssds.filter(s => s.type === 'nvme');
+  if (!nvme.length) return null;
+  const ssd = [randPick(nvme).id];
+  if (Math.random() < 0.4) ssd.push(randPick(P.ssds).id);
+  return { cpu: cpu.id, mobo: mobo.id, ram, gpu, ssd, psu: psu.id, cooler: cooler.id, case: kase.id };
+}
+function randomBuild() {
+  const st = settings();
+  for (let t = 0; t < 80; t++) {
+    const b = tryRandomCombo();
+    if (!b) continue;
+    const a = P.analyze(b, st);
+    if (a.canPost) {
+      Object.assign(build, b);
+      onChange();
+      const msg = L('🎲 随机配置：' + [b.cpu, b.mobo, gpuNames(b)].filter(Boolean).join(' + '),
+        '🎲 Random build: ' + [b.cpu, b.mobo, gpuNames(b)].filter(Boolean).join(' + '));
+      if (window.STRATA_3D && window.STRATA_3D.toast) window.STRATA_3D.toast(msg);
+      return;
+    }
+  }
+  const msg = L('这次没配出一套能点亮的组合，再点一次试试', 'No compatible combo this round — click again');
+  if (window.STRATA_3D && window.STRATA_3D.toast) window.STRATA_3D.toast(msg); else console.warn(msg);
+}
+function gpuNames(b) { return b.gpu.map(g => (P.byId(g) || {}).name).join(' / '); }
 
 window.addEventListener('DOMContentLoaded', () => {
   /* 预载"现机"配置，让页面一打开就有东西看 */
