@@ -29,10 +29,44 @@ window.STRATA_ASSETS = {
     'rtx-3080-20g': { noGlb: true },
     'rtx-3080-10g': { noGlb: true },
     'rtx-4070s':    { noGlb: true },
-    'i7-14700':     { glb: 'cpu_lga1700.glb' },
-    'i7-12700KF':   { glb: 'cpu_lga1700.glb' },
-    'psu-1250t':    { glb: 'psu_atx.glb' },
-    'psu-1000p':    { glb: 'psu_atx.glb' },
+    /* ---- CPU 白模（圆润大件，混元3D 适用；2026-10-19 扩至全平台）----
+     * LGA1700（Intel 12/13/14 代，正方形 45×45 单顶盖）共用 cpu_lga1700.glb，默认朝向。
+     * AM5（AMD 7/9 代，正方形 40×40 + 顶边双三角防呆缺口）用专属 cpu_am5.glb：
+     *   白模原始轴 = X/Z 平面（45×45 方片）、Y 厚度（混元按 45° 斜俯视参考图生成，
+     *   平面落在 XZ）。fitBox 是 {x:6 厚, y:45, z:45}（平面在 YZ、厚度在 X），
+     *   故绕 Z 转 -90°（rot=[0,0,-π/2]）：原 Y 厚度→新 X、原 X 平面→新 Y、原 Z 不变，
+     *   三轴对齐；-90°（而非 +90°）让 IHS 顶面法线落 +X（侧透可见面，与蚀刻贴图同侧）。
+     * AM4（长方形带两侧耳）/TRX4/SP3（HEDT 大顶盖）形状与消费级白模差异大，保持程序化。
+     * IHS 蚀刻型号贴图由 buildCPU 的 postGlbDecal 在白模加载后浮挂 +X 面（叠加细节）。 */
+    'i3-12100':     { glb: 'cpu_lga1700.glb' }, 'i3-12100F':    { glb: 'cpu_lga1700.glb' },
+    'i5-12400':     { glb: 'cpu_lga1700.glb' }, 'i5-13400F':    { glb: 'cpu_lga1700.glb' },
+    'i5-13600KF':   { glb: 'cpu_lga1700.glb' }, 'i5-14400F':    { glb: 'cpu_lga1700.glb' },
+    'i5-14600KF':   { glb: 'cpu_lga1700.glb' }, 'i7-12700KF':   { glb: 'cpu_lga1700.glb' },
+    'i7-13700KF':   { glb: 'cpu_lga1700.glb' }, 'i7-14700K':    { glb: 'cpu_lga1700.glb' },
+    'i7-14700':     { glb: 'cpu_lga1700.glb' }, 'i9-12900KS':   { glb: 'cpu_lga1700.glb' },
+    'i9-13900KF':   { glb: 'cpu_lga1700.glb' }, 'i9-14900K':    { glb: 'cpu_lga1700.glb' },
+    'i9-14900KF':   { glb: 'cpu_lga1700.glb' },
+    'r5-7600X':     { glb: 'cpu_am5.glb', rot: [0, 0, -Math.PI / 2] },
+    'r5-9600X':     { glb: 'cpu_am5.glb', rot: [0, 0, -Math.PI / 2] },
+    'r7-7700':      { glb: 'cpu_am5.glb', rot: [0, 0, -Math.PI / 2] },
+    'r7-7800X3D':   { glb: 'cpu_am5.glb', rot: [0, 0, -Math.PI / 2] },
+    'r7-9700X':     { glb: 'cpu_am5.glb', rot: [0, 0, -Math.PI / 2] },
+    'r7-9800X3D':   { glb: 'cpu_am5.glb', rot: [0, 0, -Math.PI / 2] },
+    'r9-7900X':     { glb: 'cpu_am5.glb', rot: [0, 0, -Math.PI / 2] },
+    'r9-7950X':     { glb: 'cpu_am5.glb', rot: [0, 0, -Math.PI / 2] },
+    'r9-9900X':     { glb: 'cpu_am5.glb', rot: [0, 0, -Math.PI / 2] },
+    'r9-9900X3D':   { glb: 'cpu_am5.glb', rot: [0, 0, -Math.PI / 2] },
+    'r9-9950X':     { glb: 'cpu_am5.glb', rot: [0, 0, -Math.PI / 2] },
+    'r9-9950X3D':   { glb: 'cpu_am5.glb', rot: [0, 0, -Math.PI / 2] },
+    /* ---- 电源白模（标准 ATX 盒体 150×85×len，圆润大件通用；len 随功率 fitBox 自适应）----
+     * psu_atx.glb 按 AX1200i 参考图生成，海盗船系挂 AX1200i 铭牌（postGlbDecal 品牌分流），
+     * 非海盗船电源挂白模素面（程序化标签灯被隐藏，比张冠李戴印错标更稳）。 */
+    'psu-550':        { glb: 'psu_atx.glb' }, 'psu-650bm':      { glb: 'psu_atx.glb' },
+    'psu-750':        { glb: 'psu_atx.glb' }, 'psu-750atx31':   { glb: 'psu_atx.glb' },
+    'psu-850g':       { glb: 'psu_atx.glb' }, 'psu-850atx31':   { glb: 'psu_atx.glb' },
+    'psu-1000p':      { glb: 'psu_atx.glb' }, 'psu-1000atx31':  { glb: 'psu_atx.glb' },
+    'psu-1200g':      { glb: 'psu_atx.glb' }, 'psu-1250t':      { glb: 'psu_atx.glb' },
+    'psu-1600':       { glb: 'psu_atx.glb' },
     // 强制程序化（动画/教学要素密集）：
     // 散热塔实测：混元3D 双塔 GLB 会把薄鳍片糊成金属团、且一体件替换掉旋转风扇（见 scripts/probe_cooler_glb.cjs A/B），
     // 程序化版鳍片清晰+风扇转，观感更好 → 全部散热保持程序化（GLB 备份在 ../glb_out/simp05/cooler_tower.glb）。

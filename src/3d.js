@@ -667,10 +667,18 @@ function buildCPU(c) {
   const ihs = box(3.5, L.cpu.s - 12, L.cpu.s - 8, M.nickel, 6.5, L.cpu.y, L.cpu.z); g.add(ihs);
   /* pc53 写实 IHS 顶盖贴图：贴 +X 面（侧透可见面），镀镍拉丝+蚀刻型号。
      装了散热器时被冷头/塔体遮住，和真机一致。
-     AMD 阵营（AM4/AM5/TRX4/SP3）用红黑 IHS 贴图（texdata4），素材缺失时不贴（宁缺勿错）。 */
-  const ihsTex = c.brand === 'AMD' ? M.__cpuIhsAmd : M.__cpuIhs;
-  if (ihsTex) g.add(texPlane(L.cpu.s - 8, L.cpu.s - 12, ihsTex, 8.55, L.cpu.y, L.cpu.z,
-    [0, Math.PI / 2, 0], { metal: 0.9, rough: 0.25 }));
+     AMD 阵营（AM4/AM5/TRX4/SP3）用红黑 IHS 贴图（texdata4），素材缺失时不贴（宁缺勿错）。
+     GLB 版（已登记 cpu_lga1700/cpu_am5 白模的型号）attachGLB 会把程序化子件整组
+     visible=false，蚀刻型号会被一起藏掉——所以贴图走 postGlbDecal 在白模加载后补挂
+     （同 buildPSU 铭牌机制），浮在 GLB 顶盖表面（叠加细节，不动 3D 布局）。
+     GLB 版浮空高度取 9.2（白模 +X 极值≈8.5，留 0.7mm 防 z-fighting），程序化版仍 8.55。 */
+  const addIhs = (glb) => {
+    const ihsTex = c.brand === 'AMD' ? M.__cpuIhsAmd : M.__cpuIhs;
+    if (ihsTex) g.add(texPlane(L.cpu.s - 8, L.cpu.s - 12, ihsTex, glb ? 9.2 : 8.55, L.cpu.y, L.cpu.z,
+      [0, Math.PI / 2, 0], { metal: 0.9, rough: 0.25 }));
+  };
+  addIhs(false);
+  g.userData.postGlbDecal = () => addIhs(true);
   g.userData.anchor = [5.5, L.cpu.y, L.cpu.z];
   g.userData.fitBox = { x: 6, y: L.cpu.s, z: L.cpu.s };
   return g;
