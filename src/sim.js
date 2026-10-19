@@ -21,7 +21,11 @@
   'use strict';
   const L = (zh, en) => (typeof window !== 'undefined' && window.L) ? window.L(zh, en) : zh;
 
-  const ARCH_F = { turing: 0.75, ampere: 1.0, ada: 1.05, blackwell: 1.15 };
+  /* ARCH_F：架构效率系数（decode 带宽利用 + prefill 算力口径）。
+   * AMD 系数已把 Vulkan/HIP 路径折损折进架构值：Strata 官方 CUDA 优先，
+   * RDNA 走 Vulkan 的 kernel 覆盖与调度不如 CUDA（社区实测口径 ~0.8~0.85），
+   * batch 路径（issue#776）只在 NVIDIA 卡启用，见 batchOK。 */
+  const ARCH_F = { turing: 0.75, ampere: 1.0, ada: 1.05, blackwell: 1.15, rdna2: 0.70, rdna3: 0.80, rdna4: 0.85 };
   const SIMD_F = { '512': 1.05, vnni: 1.12, avx2: 1.0 };
   const THINK = { light: { f: 1.06, out: 0.6 }, balanced: { f: 1.0, out: 1.0 }, deep: { f: 0.90, out: 2.2 } };
   const POOL = { iq3_s: 55, ud_q4: 72, iq3_xxs: 46, iq2_xs: 36, q4_27b: 11 }; // 专家池GiB（UD-Q4实测装载71.73G）
@@ -52,7 +56,7 @@
         const displayTax = (!a.igpuChosen && i === 0) ? 1.2 : 0;
         const free = Math.max(0.5, g.vram - 1.0 - 1.5 - displayTax);
         return { name: g.name, vram: g.vram, free, bw: g.bw, sm: g.sm, frac: g.slot.frac, gbps: g.slot.gbps,
-                 arch: ARCH_F[g.arch] || 1, tdp: g.tdp, slots: slotsOf(g.vram - displayTax), igpu: false };
+                 arch: ARCH_F[g.arch] || 1, tdp: g.tdp, slots: slotsOf(g.vram - displayTax), igpu: false, amd: g.vendor === 'amd' };
       });
     } else {
       cards = [{ name: a.cpu.igpu + '（核显输出）', vram: 2, free: 0.5, bw: 50, sm: 8, frac: 1, gbps: 64, arch: 0.5, tdp: a.cpu.tdp, slots: 0, igpu: true }];
@@ -76,6 +80,8 @@
     hit = Math.min(1, hit * (1 + 0.10 * fV));
 
     /* ---- decode ---- */
+    if (cards.some(c => c.amd)) out.warns.push(L('A 卡走 Vulkan/HIP 路径：Strata 官方 CUDA 优先，RDNA 的 kernel 覆盖与调度是二等公民（已按社区口径折损）',
+      'Radeon runs on the Vulkan/HIP path: Strata is CUDA-first, RDNA kernel coverage is second-class (community-measured penalty already applied)'));
     const dual = cards.length >= 2;
     let hw;
     if (dual) {
@@ -91,8 +97,9 @@
        仪表盘、跑分卡、硬件对比都用这同一个数，所以不会出现两处对不上。 */
     let decode = decodeRaw * DECODE_BOOST;
 
-    /* 并发：全VRAM驻留 + Blackwell/Ada → batch 路径（issue#776 +29%） */
-    const batchOK = fV >= 0.95 && cards.some(c => c.arch >= 1.05);
+    /* 并发：全VRAM驻留 + Blackwell/Ada → batch 路径（issue#776 +29%）。
+       batch 内核目前只在 CUDA 路径可用：A 卡即使全驻留也不启用。 */
+    const batchOK = fV >= 0.95 && cards.some(c => c.arch >= 1.05 && !c.amd);
     let decodePer = decode, decodeTotal = decode;
     if (conc > 1) {
       if (batchOK) { decodePer = decode * 0.94; decodeTotal = decodePer * conc * 1.05; }

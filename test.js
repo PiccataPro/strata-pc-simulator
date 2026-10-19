@@ -114,5 +114,96 @@ check('单机械盘跑权重警告', r.warns.some(w => w.includes('机械') || w
 r = run({ cpu: 'i9-14900KF', mobo: 'z790-taichi', ram: ram96, gpu: ['rtx-3090'], ssd: ['ti600-1t'], psu: 'psu-1000p', cooler: 'ag400', case: 'mft3f' });
 check('AG400压14900KF警告', r.warns.some(w => w.includes('散热压不住') || w.includes('温度墙')), r.warns.join('|'));
 
+console.log('=== 扩库锚点（2026-10-18 素材库扩展） ===');
+/* AM4 点亮：R5-5600 + B550M + DDR4 + A卡 */
+r = run({ cpu: 'r5-5600', mobo: 'b550m-mortar', ram: ['d4-16-3200', 'd4-16-3200'], gpu: ['rx-6750xt-12g'], ssd: ['ti600-1t'], psu: 'psu-750', cooler: 'ag400', case: 'mft3f' });
+check('AM4平台点亮(5600+B550M+DDR4)', r.ok, r.errors.join('|'));
+
+/* A卡软件栈折损：同容量同带宽 7900XTX(rdna3) vs 3090(ampere) → A卡 prefill 更低、batch 禁用、Vulkan 警告 */
+const rAmd = run({ cpu: 'r7-9700X', mobo: 'x670e-evo', ram: ['d5-32-6000', 'd5-32-6000'], gpu: ['rx-7900xtx-24g'], ssd: ['ti600-1t'], psu: 'psu-1000p', cooler: 'ak620', case: 'ft7f' });
+const rNv = run({ cpu: 'r7-9700X', mobo: 'x670e-evo', ram: ['d5-32-6000', 'd5-32-6000'], gpu: ['rtx-3090'], ssd: ['ti600-1t'], psu: 'psu-1000p', cooler: 'ak620', case: 'ft7f' });
+check('A卡prefill折损(<同带宽3090)', rAmd.m.prefill < rNv.m.prefill, '7900XTX=' + rAmd.m.prefill + ' vs 3090=' + rNv.m.prefill);
+check('A卡batch禁用(CUDA-only)', rAmd.m.batchOK === false, 'batchOK=' + rAmd.m.batchOK);
+check('A卡Vulkan二等公民警告', rAmd.warns.some(w => w.includes('Vulkan')), rAmd.warns.join('|'));
+
+/* 9800X3D + X670E 双 9070XT：CPU 直连 x8/x8 拆分，两卡 frac 满分 */
+r = run({ cpu: 'r7-9800X3D', mobo: 'x670e-evo', ram: ['d5-32-6000', 'd5-32-6000'], gpu: ['rx-9070xt-16g', 'rx-9070xt-16g'], ssd: ['ti600-1t'], psu: 'psu-1600', cooler: 'ak620', case: 'ft7f' });
+check('9800X3D+X670E双9070XT点亮', r.ok, r.errors.join('|'));
+check('X670E双卡x8/x8 frac满分', r.hw.gpuAssign.length === 2 && r.hw.gpuAssign.every(g => g.slot.lanes === 8 && g.slot.frac >= 0.99), JSON.stringify(r.hw.gpuAssign.map(g => g.slot.lanes + '/' + g.slot.frac)));
+
+/* 5080(Blackwell bw960) prefill > 4070S(Ada bw504) */
+const r5080 = run({ cpu: 'r7-9700X', mobo: 'x670e-evo', ram: ['d5-32-6000', 'd5-32-6000'], gpu: ['rtx-5080'], ssd: ['ti600-1t'], psu: 'psu-850g', cooler: 'ak620', case: 'mft3f' });
+const r4070s = run({ cpu: 'r7-9700X', mobo: 'x670e-evo', ram: ['d5-32-6000', 'd5-32-6000'], gpu: ['rtx-4070s'], ssd: ['ti600-1t'], psu: 'psu-850g', cooler: 'ak620', case: 'mft3f' });
+check('5080 prefill>4070S', r5080.m.prefill > r4070s.m.prefill, '5080=' + r5080.m.prefill + ' vs 4070S=' + r4070s.m.prefill);
+
+/* SP3 点亮：EPYC 7453 + H11DSi + RECC（eccOK 板放行） */
+r = run({ cpu: 'epyc-7453', mobo: 'h11dsi', ram: ['d4-32-3200r', 'd4-32-3200r', 'd4-32-3200r', 'd4-32-3200r'], gpu: ['rtx-3090'], ssd: ['ti600-1t'], psu: 'psu-1000p', cooler: 'ak620', case: 'ft7f' });
+check('EPYC+H11DSi+RECC点亮', r.ok, r.errors.join('|'));
+
+/* RECC 桌面板拦截：AM4 DDR4 板（非 eccOK）插 RECC → 点不亮 */
+r = run({ cpu: 'r5-5600', mobo: 'b550m-mortar', ram: ['d4-32-3200r', 'd4-32-3200r'], gpu: ['rtx-3080-20g'], ssd: ['ti600-1t'], psu: 'psu-850g', cooler: 'ag400', case: 'mft3f' });
+check('RECC桌面板点不亮', !r.ok && r.errors.some(e => e.includes('RECC')), r.errors.join('|'));
+
+/* B550M 整槽失效坑：装 2 个 NVMe → 第二槽(pos4) toLanes:0 */
+r = run({ cpu: 'r7-5700X', mobo: 'b550m-mortar', ram: ['d4-16-3200', 'd4-16-3200'], gpu: ['rtx-3080-20g', 'rtx-3080-20g'], ssd: ['ti600-1t', 'sn850x-2t'], psu: 'psu-1000p', cooler: 'ak620', case: 'mft3f' });
+const b550s4 = r.hw.pcie.find(p => p.pos === 4);
+check('B550M装双M.2第二槽整槽失效(x0)', b550s4 && b550s4.lanes === 0, JSON.stringify(b550s4));
+
+/* X870E PRO ICE 反直觉坑：装 2 个 NVMe → 第一槽(pos1) x16→x8 */
+r = run({ cpu: 'r9-9950X', mobo: 'x870e-aorus-pro-ice', ram: ['d5-32-6000', 'd5-32-6000'], gpu: ['rtx-3090', 'rtx-3080-20g'], ssd: ['ti600-1t', 'sn850x-2t'], psu: 'psu-1250t', cooler: 'aio360', case: 'ft7f' });
+const iceS1 = r.hw.pcie.find(p => p.pos === 1);
+check('X870E-ICE装双M.2主槽降x8', iceS1 && iceS1.lanes === 8, JSON.stringify(iceS1));
+
+/* B650 TOMAHAWK 皮x16芯x2：第二槽(pos4) 电气 x2、frac≈0.13 */
+r = run({ cpu: 'r9-9950X', mobo: 'b650-tomahawk', ram: ['d5-32-6000', 'd5-32-6000'], gpu: ['rtx-3080-20g', 'rtx-3080-20g'], ssd: ['ti600-1t'], psu: 'psu-1000p', cooler: 'aio360', case: 'ft7f' });
+const b650s4 = r.hw.pcie.find(p => p.pos === 4);
+check('B650第二槽皮x16芯x2(frac≤0.15)', b650s4 && b650s4.lanes === 2 && b650s4.src === 'chipset' && b650s4.frac <= 0.15, JSON.stringify(b650s4));
+
+/* X670E AORUS MASTER 反直觉：旗舰板第二槽仍是芯片组 x4 */
+r = run({ cpu: 'r9-9950X', mobo: 'x670e-aorus-master', ram: ['d5-32-6000', 'd5-32-6000'], gpu: ['rtx-3080-20g', 'rtx-3080-20g'], ssd: ['ti600-1t'], psu: 'psu-1000p', cooler: 'aio360', case: 'ft7f' });
+const x670as4 = r.hw.pcie.find(p => p.pos === 4);
+check('X670E-AORUS第二槽芯片组x4(旗舰也坑)', x670as4 && x670as4.lanes === 4 && x670as4.src === 'chipset', JSON.stringify(x670as4));
+
+console.log('=== 数据完整性 ===');
+/* id 全局唯一 */
+const allParts = [].concat(P.cpus, P.mobos, P.dimms, P.gpus, P.ssds, P.psus, P.coolers, P.cases);
+const idList = allParts.map(p => p.id);
+const dupIds = idList.filter((x, i) => idList.indexOf(x) !== i);
+check('配件 id 全局唯一', dupIds.length === 0, '重复: ' + (dupIds.join(',') || '无') + '（共 ' + allParts.length + ' 件）');
+
+/* 每个 CPU 至少有一块匹配 socket 的主板 */
+const orphanCpu = P.cpus.filter(c => !P.mobos.some(m => m.socket === c.socket)).map(c => c.id + '(' + c.socket + ')');
+check('每个CPU都有匹配主板', orphanCpu.length === 0, orphanCpu.join(',') || '无孤儿');
+
+/* 每块主板的 DDR 代际至少被一个匹配 CPU 支持 */
+const orphanMobo = P.mobos.filter(m => !P.cpus.some(c => c.socket === m.socket && c.ddr.includes(m.ddr))).map(m => m.id);
+check('每块主板DDR有匹配CPU', orphanMobo.length === 0, orphanMobo.join(',') || '无孤儿');
+
+/* 筛选字段完整性 */
+const cpuMiss = P.cpus.filter(c => !c.brand || !c.platform || !c.gen || !c.tier).map(c => c.id);
+check('CPU筛选字段齐全(brand/platform/gen/tier)', cpuMiss.length === 0, cpuMiss.join(',') || '无缺失');
+const moboMiss = P.mobos.filter(m => !m.brand || !m.platform || !m.chipset).map(m => m.id);
+check('主板筛选字段齐全(brand/platform/chipset)', moboMiss.length === 0, moboMiss.join(',') || '无缺失');
+const gpuMiss = P.gpus.filter(g => !g.vendor || !g.series || g.vram == null).map(g => g.id);
+check('显卡筛选字段齐全(vendor/series/vram)', gpuMiss.length === 0, gpuMiss.join(',') || '无缺失');
+
+console.log('=== 分级筛选（filterParts 纯函数） ===');
+/* 逐层命中：品牌→代系→档位 */
+check('筛选 CPU=Intel 命中12', P.filterParts('cpu', P.cpus, { brand: 'Intel' }).length === 12, 'count=' + P.filterParts('cpu', P.cpus, { brand: 'Intel' }).length);
+check('筛选 CPU=Intel→13代 命中4款', P.filterParts('cpu', P.cpus, { brand: 'Intel', gen: '13代' }).map(c => c.id).sort().join(',') === 'i5-13400F,i5-13600KF,i7-13700KF,i9-13900KF', P.filterParts('cpu', P.cpus, { brand: 'Intel', gen: '13代' }).map(c => c.id).join(','));
+check('筛选 CPU=Intel→i5 命中4款', P.filterParts('cpu', P.cpus, { brand: 'Intel', tier: 'i5' }).length === 4, P.filterParts('cpu', P.cpus, { brand: 'Intel', tier: 'i5' }).map(c => c.id).join(','));
+/* 显卡阵营：A 卡 5 款 */
+check('筛选 显卡=A卡 命中5款', P.filterParts('gpu', P.gpus, { vendor: 'A 卡' }).length === 5, P.filterParts('gpu', P.gpus, { vendor: 'A 卡' }).map(g => g.id).join(','));
+check('筛选 显卡=N卡 无A卡混入', P.filterParts('gpu', P.gpus, { vendor: 'N 卡' }).every(g => g.vendor === 'nvidia'), 'count=' + P.filterParts('gpu', P.gpus, { vendor: 'N 卡' }).length);
+/* 内存代际 */
+check('筛选 内存=DDR4 命中5', P.filterParts('ram', P.dimms, { gen: '4' }).length === 5, 'count=' + P.filterParts('ram', P.dimms, { gen: '4' }).length);
+check('筛选 内存=DDR5 命中8', P.filterParts('ram', P.dimms, { gen: '5' }).length === 8, 'count=' + P.filterParts('ram', P.dimms, { gen: '5' }).length);
+/* 主板品牌→平台 */
+check('筛选 主板=华硕→AM5 命中2', P.filterParts('mobo', P.mobos, { brand: '华硕', platform: 'AM5' }).map(m => m.id).sort().join(',') === 'x670e-evo,x870e-creator', P.filterParts('mobo', P.mobos, { brand: '华硕', platform: 'AM5' }).map(m => m.id).join(','));
+/* opts 动态去重 + 排序：菜单自动长出来，不用维护两份 */
+check('opts 品牌层去重=[Intel,AMD]', JSON.stringify(P.FILTER_TREE.cpu[0].opts(P.cpus)) === '["Intel","AMD"]', JSON.stringify(P.FILTER_TREE.cpu[0].opts(P.cpus)));
+check('opts 代系层按参考序排', JSON.stringify(P.FILTER_TREE.cpu[2].opts(P.cpus)) === '["12代","13代","14代","Zen3","Zen4","Zen5","Zen2","Milan"]', JSON.stringify(P.FILTER_TREE.cpu[2].opts(P.cpus)));
+check('opts 显卡阵营=[N卡,A卡]', JSON.stringify(P.FILTER_TREE.gpu[0].opts(P.gpus)) === '["N 卡","A 卡"]', JSON.stringify(P.FILTER_TREE.gpu[0].opts(P.gpus)));
+
 console.log('\n===== ' + pass + ' PASS / ' + fail + ' FAIL =====');
 process.exit(fail ? 1 : 0);
