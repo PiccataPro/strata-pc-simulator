@@ -40,12 +40,19 @@
     { id:'i7-14700',    cat:'cpu', name:'i7-14700（非K）',        brand:'Intel', platform:'LGA1700', gen:'14代', tier:'i7',  socket:'LGA1700', p:8,  pt:16, e:12, et:12, thr:28, simd:'vnni', igpu:'UHD770',        pcie:{lanes:16, gen:5}, ddr:['4','5'], memMax:128, tdp:65,  pl2:212,  price:2100, note:'方案E核心：8P+12E/28T，UHD770核显输出→双卡纯计算；非K 65W档缩缸风险最低，BIOS须含0x129/0x12B微码' },
     { id:'i9-14900K',   cat:'cpu', name:'i9-14900K',             brand:'Intel', platform:'LGA1700', gen:'14代', tier:'i9',  socket:'LGA1700', p:8,  pt:16, e:16, et:16, thr:32, simd:'vnni', igpu:'UHD770',        pcie:{lanes:16, gen:5}, ddr:['4','5'], memMax:128, tdp:125, pl2:253,  price:2450, note:'带 UHD770 核显可纯计算化；仍属高压缩缸档' },
     { id:'i9-14900KF',  cat:'cpu', name:'i9-14900KF',            brand:'Intel', platform:'LGA1700', gen:'14代', tier:'i9',  socket:'LGA1700', p:8,  pt:16, e:16, et:16, thr:32, simd:'vnni', igpu:'none',          pcie:{lanes:16, gen:5}, ddr:['4','5'], memMax:128, tdp:125, pl2:253,  price:2200, note:'13/14代缩缸高压档，二手风险高。贩子集体拒收13/14代i9（NGA 10-07），二手压价' },
+    { id:'i3-12100F',   cat:'cpu', name:'i3-12100F',             brand:'Intel', platform:'LGA1700', gen:'12代', tier:'i3',  socket:'LGA1700', p:4,  pt:8,  e:0,  et:0,  thr:8,  simd:'vnni', igpu:'none',          pcie:{lanes:16, gen:5}, ddr:['4','5'], memMax:128, tdp:58,  pl2:89,   price:380,  note:'12100 的无核显版：更便宜，但亮机必须独卡' },
+    { id:'i5-14400F',   cat:'cpu', name:'i5-14400F',             brand:'Intel', platform:'LGA1700', gen:'14代', tier:'i5',  socket:'LGA1700', p:6,  pt:12, e:4,  et:4,  thr:16, simd:'vnni', igpu:'none',          pcie:{lanes:16, gen:5}, ddr:['4','5'], memMax:128, tdp:65,  pl2:148,  price:900,  note:'13400F 同构马甲：6P+4E/16T，非K 低压档缩缸风险小' },
+    { id:'i9-12900KS',  cat:'cpu', name:'i9-12900KS',            brand:'Intel', platform:'LGA1700', gen:'12代', tier:'i9',  socket:'LGA1700', p:8,  pt:16, e:8,  et:8,  thr:32, simd:'vnni', igpu:'UHD770',        pcie:{lanes:16, gen:5}, ddr:['4','5'], memMax:128, tdp:150, pl2:241,  price:2100, note:'12代特挑大核 5.5GHz：12代无缩缸门，比13/14代i9二手更稳' },
     /* AMD AM4（Zen3，DDR4 平台——内存涨价潮里的省钱路线） */
     { id:'r5-5600',     cat:'cpu', name:'Ryzen 5 5600',          brand:'AMD', platform:'AM4', gen:'Zen3', tier:'R5', socket:'AM4', p:6, pt:12, e:0, et:0, thr:12, simd:'avx2', igpu:'none',        pcie:{lanes:20, gen:4}, ddr:['4'], memMax:128, tdp:65,  pl2:76,   price:450,  note:'AM4 亮机卡：6C12T 无核显，配 B450/B550 极便宜' },
+    { id:'r5-5500',     cat:'cpu', name:'Ryzen 5 5500',          brand:'AMD', platform:'AM4', gen:'Zen3', tier:'R5', socket:'AM4', p:6, pt:12, e:0, et:0, thr:12, simd:'avx2', igpu:'none',        pcie:{lanes:20, gen:3}, ddr:['4'], memMax:128, tdp:65,  pl2:76,   price:380,  note:'5600 降频版且直连只有 PCIe3.0（同 5600G 砍核显）：亮机可以，副卡链路更慢' },
+    { id:'r5-5600X',    cat:'cpu', name:'Ryzen 5 5600X',         brand:'AMD', platform:'AM4', gen:'Zen3', tier:'R5', socket:'AM4', p:6, pt:12, e:0, et:0, thr:12, simd:'avx2', igpu:'none',        pcie:{lanes:20, gen:4}, ddr:['4'], memMax:128, tdp:65,  pl2:76,   price:520,  note:'5600 高频版：同为 Zen3 6C12T，二手价差很小' },
     { id:'r5-5600G',    cat:'cpu', name:'Ryzen 5 5600G',         brand:'AMD', platform:'AM4', gen:'Zen3', tier:'R5', socket:'AM4', p:6, pt:12, e:0, et:0, thr:12, simd:'avx2', igpu:'Vega 7',      pcie:{lanes:20, gen:3}, ddr:['4'], memMax:128, tdp:65,  pl2:88,   price:520,  note:'带 Vega7 核显可免独卡点亮；注意 5600G 直连只有 PCIe3.0' },
     { id:'r7-5700X',    cat:'cpu', name:'Ryzen 7 5700X',         brand:'AMD', platform:'AM4', gen:'Zen3', tier:'R7', socket:'AM4', p:8, pt:16, e:0, et:0, thr:16, simd:'avx2', igpu:'none',        pcie:{lanes:20, gen:4}, ddr:['4'], memMax:128, tdp:65,  pl2:76,   price:650,  note:'8C16T 65W，DDR4 平台省钱主力' },
+    { id:'r7-5700X3D',  cat:'cpu', name:'Ryzen 7 5700X3D',       brand:'AMD', platform:'AM4', gen:'Zen3', tier:'R7', socket:'AM4', p:8, pt:16, e:0, et:0, thr:16, simd:'avx2', igpu:'none',        pcie:{lanes:20, gen:4}, ddr:['4'], memMax:128, tdp:105, pl2:110,  price:850,  note:'96MB 3D缓存的平价版 5800X3D：游戏接近，LLM 同样吃不到 3D 缓存' },
     { id:'r7-5800X3D',  cat:'cpu', name:'Ryzen 7 5800X3D',       brand:'AMD', platform:'AM4', gen:'Zen3', tier:'R7', socket:'AM4', p:8, pt:16, e:0, et:0, thr:16, simd:'avx2', igpu:'none',        pcie:{lanes:20, gen:4}, ddr:['4'], memMax:128, tdp:105, pl2:110,  price:1050, note:'96MB 3D缓存——游戏神U，对 LLM 推理帮助有限' },
     { id:'r9-5900X',    cat:'cpu', name:'Ryzen 9 5900X',         brand:'AMD', platform:'AM4', gen:'Zen3', tier:'R9', socket:'AM4', p:12, pt:24, e:0, et:0, thr:24, simd:'avx2', igpu:'none',       pcie:{lanes:20, gen:4}, ddr:['4'], memMax:128, tdp:105, pl2:140,  price:1150, note:'12C24T 二手性价比；DDR4 双通道带宽是 expert 计算上限' },
+    { id:'r9-5950X',    cat:'cpu', name:'Ryzen 9 5950X',         brand:'AMD', platform:'AM4', gen:'Zen3', tier:'R9', socket:'AM4', p:16, pt:32, e:0, et:0, thr:32, simd:'avx2', igpu:'none',       pcie:{lanes:20, gen:4}, ddr:['4'], memMax:128, tdp:105, pl2:140,  price:1700, note:'AM4 末代 16C32T：线程多但 Zen3 IPC 老，LLM 场景不如 9950X' },
     /* AMD AM5（Zen4/Zen5，DDR5，AVX-512） */
     { id:'r5-7600X',    cat:'cpu', name:'Ryzen 5 7600X',         brand:'AMD', platform:'AM5', gen:'Zen4', tier:'R5', socket:'AM5', p:6, pt:12, e:0, et:0, thr:12, simd:'512', igpu:'Radeon 610M',  pcie:{lanes:24, gen:5}, ddr:['5'], memMax:128, tdp:105, pl2:110,  price:900,  note:'AM5 入门 6C12T，AVX-512' },
     { id:'r7-7700',     cat:'cpu', name:'Ryzen 7 7700',          brand:'AMD', platform:'AM5', gen:'Zen4', tier:'R7', socket:'AM5', p:8, pt:16, e:0, et:0, thr:16, simd:'512', igpu:'Radeon 680M',  pcie:{lanes:24, gen:5}, ddr:['5'], memMax:192, tdp:65,  pl2:88,   price:1100, note:'AM5入门，AVX-512' },
@@ -53,9 +60,12 @@
     { id:'r9-7900X',    cat:'cpu', name:'Ryzen 9 7900X',         brand:'AMD', platform:'AM5', gen:'Zen4', tier:'R9', socket:'AM5', p:12, pt:24, e:0, et:0, thr:24, simd:'512', igpu:'Radeon 680M', pcie:{lanes:24, gen:5}, ddr:['5'], memMax:128, tdp:170, pl2:200,  price:1600, note:'12C24T Zen4' },
     { id:'r9-7950X',    cat:'cpu', name:'Ryzen 9 7950X',         brand:'AMD', platform:'AM5', gen:'Zen4', tier:'R9', socket:'AM5', p:16, pt:32, e:0, et:0, thr:32, simd:'512', igpu:'Radeon 680M', pcie:{lanes:24, gen:5}, ddr:['5'], memMax:128, tdp:170, pl2:230, price:2200, note:'16C32T Zen4，二手已低于 9950X' },
     { id:'r7-9700X',    cat:'cpu', name:'Ryzen 7 9700X',         brand:'AMD', platform:'AM5', gen:'Zen5', tier:'R7', socket:'AM5', p:8, pt:16, e:0, et:0, thr:16, simd:'512', igpu:'Radeon 680M',  pcie:{lanes:24, gen:5}, ddr:['5'], memMax:256, tdp:65,  pl2:88,   price:1600, note:'Zen5 8C 低功耗档' },
+    { id:'r5-9600X',    cat:'cpu', name:'Ryzen 5 9600X',         brand:'AMD', platform:'AM5', gen:'Zen5', tier:'R5', socket:'AM5', p:6, pt:12, e:0, et:0, thr:12, simd:'512', igpu:'Radeon 680M',  pcie:{lanes:24, gen:5}, ddr:['5'], memMax:256, tdp:65,  pl2:88,   price:1250, note:'Zen5 入门 6C12T：AVX-512 一样不缺，缺的只是核数' },
     { id:'r7-9800X3D',  cat:'cpu', name:'Ryzen 7 9800X3D',       brand:'AMD', platform:'AM5', gen:'Zen5', tier:'R7', socket:'AM5', p:8, pt:16, e:0, et:0, thr:16, simd:'512', igpu:'Radeon 680M',  pcie:{lanes:24, gen:5}, ddr:['5'], memMax:192, tdp:120, pl2:162,  price:2900, note:'当前游戏最强U；LLM 推理吃 AVX-512 与带宽，3D 缓存加成有限' },
     { id:'r9-9900X',    cat:'cpu', name:'Ryzen 9 9900X',         brand:'AMD', platform:'AM5', gen:'Zen5', tier:'R9', socket:'AM5', p:12, pt:24, e:0, et:0, thr:24, simd:'512', igpu:'Radeon 680M', pcie:{lanes:24, gen:5}, ddr:['5'], memMax:256, tdp:120, pl2:162,  price:1950, note:'12C24T AVX-512' },
+    { id:'r9-9900X3D',  cat:'cpu', name:'Ryzen 9 9900X3D',       brand:'AMD', platform:'AM5', gen:'Zen5', tier:'R9', socket:'AM5', p:12, pt:24, e:0, et:0, thr:24, simd:'512', igpu:'Radeon 680M', pcie:{lanes:24, gen:5}, ddr:['5'], memMax:256, tdp:120, pl2:162,  price:2250, note:'12C24T + 140MB 缓存：X3D 对 LLM 推理加成依旧有限，贵的是游戏税' },
     { id:'r9-9950X',    cat:'cpu', name:'Ryzen 9 9950X',         brand:'AMD', platform:'AM5', gen:'Zen5', tier:'R9', socket:'AM5', p:16, pt:32, e:0, et:0, thr:32, simd:'512', igpu:'Radeon 680M', pcie:{lanes:24, gen:5}, ddr:['5'], memMax:256, tdp:170, pl2:200, price:2500, note:'方案F核心：16C32T，AVX-512激活Strata expert kernel（官方口径 a bit faster），无缩缸史，AM5可续Zen6。闲鱼/散片~¥2,500（头条10月AM5指南口径）' },
+    { id:'r9-9950X3D',  cat:'cpu', name:'Ryzen 9 9950X3D',       brand:'AMD', platform:'AM5', gen:'Zen5', tier:'R9', socket:'AM5', p:16, pt:32, e:0, et:0, thr:32, simd:'512', igpu:'Radeon 680M', pcie:{lanes:24, gen:5}, ddr:['5'], memMax:256, tdp:170, pl2:200, price:3000, note:'16C32T + 144MB 缓存：AM5 游戏旗舰；LLM 推理与 9950X 几乎无差，差价是游戏税' },
     /* HEDT / 服务器 */
     { id:'tr-3970x',    cat:'cpu', name:'Ryzen TR 3970X',        brand:'AMD', platform:'TRX4', gen:'Zen2', tier:'线程撕裂者', socket:'TRX4', p:32, pt:64, e:0, et:0, thr:64, simd:'avx2', igpu:'aspeed', pcie:{lanes:64, gen:4}, ddr:['4'], memMax:256, tdp:280, pl2:320, price:3200, note:'32C64T + 64 lane 直连：三卡好链路；Zen2 单核弱' },
     { id:'epyc-7453',   cat:'cpu', name:'EPYC 7453（Milan）',    brand:'AMD', platform:'SP3', gen:'Milan', tier:'EPYC', socket:'SP3', p:28, pt:56, e:0, et:0, thr:56, simd:'avx2', igpu:'aspeed',   pcie:{lanes:128,gen:4}, ddr:['4'], memMax:2048,tdp:155, pl2:210, price:1600, note:'官方bench反证机：无AVX-512纯AVX2，双3090照样64-78 t/s——CPU不是瓶颈' },
@@ -153,18 +163,24 @@
    * 分级字段：brand=品牌 / gen=DDR代际（一级筛选）/ size=容量（二级）/ color=马甲色（3D 用） */
   const dimms = [
     { id:'d4-8-2666',  cat:'ram', name:'DDR4 8G 2666',  brand:'金士顿', brandEn:'Kingston', gen:'4', size:8,  mt:2666, color:'black', price:300, note:'亮机条；单条只跑单通道，LLM 场景带宽致命' },
+    { id:'d4-8-3200',  cat:'ram', name:'DDR4 8G 3200',  brand:'金士顿', brandEn:'Kingston', gen:'4', size:8,  mt:3200, color:'black', price:350, note:'FURY Beast 8G×2 双通道亮机组合；125B 的死穴是容量不是频率，别为马甲多花钱' },
     { id:'d4-16-3200', cat:'ram', name:'DDR4 16G 3200', brand:'金士顿', brandEn:'Kingston', gen:'4', size:16, mt:3200, color:'black', price:550, note:'DDR4合约价+24%三个月，华强北新条最低600+' },
     { id:'d4-16-3600', cat:'ram', name:'DDR4 16G 3600 马甲条', brand:'芝奇', brandEn:'G.Skill', gen:'4', size:16, mt:3600, color:'silver', price:650, note:'Ripjaws V：AM4 甜点频率（Infinity Fabric 1:1 上限附近）' },
     { id:'d4-32-3600', cat:'ram', name:'DDR4 32G 3600', brand:'海盗船', brandEn:'Corsair', gen:'4', size:32, mt:3600, color:'black', price:1050 },
+    { id:'d4-32-3200', cat:'ram', name:'DDR4 32G 3200', brand:'金士顿', brandEn:'Kingston', gen:'4', size:32, mt:3200, color:'black', price:900, note:'FURY Beast 单条 32G：AM4 堆 64G 比 DDR5 便宜一半，代价是带宽上限' },
     { id:'d5-16-4800', cat:'ram', name:'DDR5 16G 4800', brand:'三星', brandEn:'Samsung', gen:'5', size:16, mt:4800, color:'black', price:700, note:'JEDEC 裸条无马甲：AM5 四条也能稳 4800（降频惩罚最小的选择）' },
     { id:'d5-16-5600', cat:'ram', name:'DDR5 16G 5600', brand:'金士顿', brandEn:'Kingston', gen:'5', size:16, mt:5600, color:'black', price:850, note:'全新已~¥900（百脑汇10月），二手略低' },
     { id:'d5-24-6000', cat:'ram', name:'DDR5 24G 6000', brand:'金士顿', brandEn:'Kingston', gen:'5', size:24, mt:6000, color:'black', price:1300 },
     { id:'d5-32-5200', cat:'ram', name:'DDR5 32G 5200（KF552C40）', brand:'金士顿', brandEn:'Kingston', gen:'5', size:32, mt:5200, color:'white', price:1500, note:'现机同款——96G=16+32+16+32 混插，可平移AM5。⚠2026-10内存史诗级涨价：二手32G涨过二手显卡（smzdm 10-12）' },
     { id:'d5-32-6000', cat:'ram', name:'DDR5 32G 6000 幻锋戟', brand:'芝奇', brandEn:'G.Skill', gen:'5', size:32, mt:6000, color:'silver', price:1600, note:'Trident Z5：AM5 甜点 6000（1:1 UCLK=MCLK 上限附近）' },
     { id:'d5-32-6000w', cat:'ram', name:'DDR5 32G 6000 白色马甲', brand:'海盗船', brandEn:'Corsair', gen:'5', size:32, mt:6000, color:'white', price:1650, note:'复仇者 RGB 白：白色主题装机用' },
+    { id:'d5-32-6400', cat:'ram', name:'DDR5 32G 6400 幻锋戟', brand:'芝奇', brandEn:'G.Skill', gen:'5', size:32, mt:6400, color:'silver', price:1800, note:'Trident Z5 6400 CL32：Intel Z790 高频甜点；AM5 上超 6000 无收益（1:1 墙）' },
+    { id:'d5-24-7200', cat:'ram', name:'DDR5 24G 7200 焰锋戟', brand:'芝奇', brandEn:'G.Skill', gen:'5', size:24, mt:7200, color:'black', price:1500, note:'Flare X5 24G×2 套条拆卖（EXPO CL34）：7200 高频，但 AM5 甜点在 6000——超 6000 进 1:2 模式，LLM 场景反而亏' },
+    { id:'d5-48-6000', cat:'ram', name:'DDR5 48G 6000', brand:'金士顿', brandEn:'Kingston', gen:'5', size:48, mt:6000, color:'black', price:2200, note:'FURY Beast 48G 单条：两条 96G 只占 2 槽——比 16+32 混插更干净的 96G 方案' },
     { id:'d5-48-6400', cat:'ram', name:'DDR5 48G 6400', brand:'海盗船', brandEn:'Corsair', gen:'5', size:48, mt:6400, color:'black', price:2400 },
     { id:'d5-64-5600', cat:'ram', name:'DDR5 64G 5600', brand:'海盗船', brandEn:'Corsair', gen:'5', size:64, mt:5600, color:'black', price:3300, note:'单条64G：两条=128G 双通道不降频——96G 之外的大内存新路线' },
     { id:'d4-32-3200r', cat:'ram', name:'DDR4 32G 3200 RECC', brand:'三星', brandEn:'Samsung', gen:'4', size:32, mt:3200, color:'green', ecc:true, price:700, note:'服务器拆机 RECC：EPYC/TR 板 8 通道堆容量白菜价；普通桌面板不兼容 ECC UDIMM 之外规格' },
+    { id:'d4-16-3600w', cat:'ram', name:'DDR4 16G 3600 白色马甲', brand:'海盗船', brandEn:'Corsair', gen:'4', size:16, mt:3600, color:'white', price:620, note:'复仇者 LPX 白：白色 AM4 主题装机用，频率时序与黑版 3600 相同' },
   ];
 
   /* ---------------- 显卡 ----------------
@@ -192,6 +208,8 @@
     { id:'rtx-4080s',    cat:'gpu', name:'RTX 4080 SUPER 16G',    vendor:'nvidia', brand:'NVIDIA', series:'RTX 40', tier:'80S', vram:16, bw:736, sm:102,arch:'ada',     gen:4, lanes:16, tdp:360, thick:3,   len:310, conn:'16pin',       price:7300,  benchNote:'' },
     { id:'rtx-4090',     cat:'gpu', name:'RTX 4090 24G',          vendor:'nvidia', brand:'NVIDIA', series:'RTX 40', tier:'90', vram:24, bw:1008, sm:128,arch:'ada',     gen:4, lanes:16, tdp:450, thick:3,   len:336, conn:'16pin',       price:23344,
       benchNote:'闲鱼10-16 ¥23,344两年高位——4.1倍价换不成比例提升，不买' },
+    { id:'rtx-5060-8g',  cat:'gpu', name:'RTX 5060 8G',           vendor:'nvidia', brand:'NVIDIA', series:'RTX 50', tier:'60', vram:8,  bw:448,  sm:30, arch:'blackwell',gen:5, lanes:16, tdp:145, thick:2,   len:244, conn:'8pin x1',       price:2600,  benchNote:'GDDR7 甜品卡：8G 显存装不下 KV+expert 预算，只配亮机/副卡' },
+    { id:'rtx-5060ti-16g', cat:'gpu', name:'RTX 5060 Ti 16G',     vendor:'nvidia', brand:'NVIDIA', series:'RTX 50', tier:'60Ti', vram:16, bw:448, sm:36, arch:'blackwell',gen:5, lanes:16, tdp:180, thick:2,   len:250, conn:'8pin x1',       price:3600,  benchNote:'16G 便宜但 448GB/s 带宽是小水管（同 4060Ti 16G 的 GDDR7 版）：容量够、喂不饱' },
     { id:'rtx-5070',     cat:'gpu', name:'RTX 5070 12G',          vendor:'nvidia', brand:'NVIDIA', series:'RTX 50', tier:'70', vram:12, bw:672,  sm:48, arch:'blackwell',gen:5, lanes:16, tdp:250, thick:2,   len:244, conn:'16pin(12V-2x6)', price:4500,  benchNote:'GDDR7 带宽上来了但 12G 容量仍是笼子（chunk 受限同 4070S）' },
     { id:'rtx-5070tis',  cat:'gpu', name:'RTX 5070 Ti SUPER 16G', vendor:'nvidia', brand:'NVIDIA', series:'RTX 50', tier:'70TiS', vram:16, bw:896, sm:70, arch:'blackwell',gen:5, lanes:16, tdp:300, thick:2.5, len:304, conn:'16pin(12V-2x6)', price:7200, benchNote:'' },
     { id:'rtx-5080',     cat:'gpu', name:'RTX 5080 16G',          vendor:'nvidia', brand:'NVIDIA', series:'RTX 50', tier:'80', vram:16, bw:960,  sm:84, arch:'blackwell',gen:5, lanes:16, tdp:360, thick:2.5, len:304, conn:'16pin(12V-2x6)', price:9900,  benchNote:'' },
@@ -206,6 +224,8 @@
     { id:'rx-7600-8g',   cat:'gpu', name:'RX 7600 8G',            vendor:'amd', brand:'AMD', series:'RX 7000', tier:'60', vram:8,  bw:288,  sm:32, arch:'rdna3',   gen:4, lanes:8,  tdp:165, thick:2,   len:204, conn:'8pin x1',  price:1800,  benchNote:'8G+x8 电气：亮机有余，LLM 不足' },
     { id:'rx-7800xt-16g', cat:'gpu', name:'RX 7800 XT 16G',       vendor:'amd', brand:'AMD', series:'RX 7000', tier:'80', vram:16, bw:624,  sm:60, arch:'rdna3',   gen:4, lanes:16, tdp:263, thick:2.5, len:267, conn:'8pin x2',  price:3100,  benchNote:'A卡性价比王：16G+624GB/s 硬件不输 4070TiS，软件栈折损后约等于 4070S+容量' },
     { id:'rx-7900xtx-24g', cat:'gpu', name:'RX 7900 XTX 24G',     vendor:'amd', brand:'AMD', series:'RX 7000', tier:'XTX', vram:24, bw:960, sm:96,  arch:'rdna3',   gen:4, lanes:16, tdp:355, thick:2.5, len:287, conn:'8pin x3',  price:5300,  benchNote:'24G+960GB/s 纸面=3090 价一半；ROCm/Vulkan 在 Strata 上仍是二等公民，实测口径见 benchNote 折损' },
+    { id:'rx-9060xt-16g', cat:'gpu', name:'RX 9060 XT 16G',       vendor:'amd', brand:'AMD', series:'RX 9000', tier:'60XT', vram:16, bw:320,  sm:32, arch:'rdna4',   gen:5, lanes:16, tdp:160, thick:2,   len:267, conn:'8pin x1',  price:3200,  benchNote:'AMD 官方规格：32CU/3130MHz/320GB/s/160W——16G 白菜价，但 320GB/s 带宽+Vulkan 折损双debuff' },
+    { id:'rx-9070-16g',  cat:'gpu', name:'RX 9070 16G',           vendor:'amd', brand:'AMD', series:'RX 9000', tier:'70', vram:16, bw:640,  sm:56, arch:'rdna4',   gen:5, lanes:16, tdp:220, thick:2.5, len:287, conn:'8pin x2',  price:4200,  benchNote:'AMD 官方规格：56CU/2520MHz/640GB/s/220W——比 9070XT 便宜一档，带宽相同，算力低些' },
     { id:'rx-9070xt-16g', cat:'gpu', name:'RX 9070 XT 16G',       vendor:'amd', brand:'AMD', series:'RX 9000', tier:'XT', vram:16, bw:640,  sm:64, arch:'rdna4',   gen:5, lanes:16, tdp:304, thick:2.5, len:330, conn:'8pin x2',  price:5000,  benchNote:'AMD 官方规格：64CU/2970MHz/640GB/s/304W；京东 ¥4,600-5,000 档——N 卡同价位只给 12G' },
   ];
 
@@ -218,10 +238,14 @@
     { id:'sn770-1t',     cat:'ssd', name:'WD SN770 1TB',          brand:'西数', brandEn:'WD', type:'nvme', gen:4, lanes:4, cap:'1T',    read:5150, tdp:6, price:580 },
     { id:'sn850x-2t',    cat:'ssd', name:'三星 SN850X 2TB',       brand:'三星', brandEn:'Samsung', type:'nvme', gen:4, lanes:4, cap:'2T',    read:7300, tdp:7, price:1300 },
     { id:'tiplus7100-2t',cat:'ssd', name:'致态 TiPlus7100 2TB',   brand:'致态', brandEn:'ZHITAI', type:'nvme', gen:4, lanes:4, cap:'2T',    read:7000, tdp:6, price:1150 },
+    { id:'sn7100-1t',    cat:'ssd', name:'三星 SN7100 1TB',       brand:'三星', brandEn:'Samsung', type:'nvme', gen:4, lanes:4, cap:'1T',    read:7250, tdp:6, price:650, note:'SN770 后继款：TLC 无缓高性价比，权重流式读 SLC 内 ~5GB/s' },
     { id:'sn5000-4t',    cat:'ssd', name:'致态 TiPro7100 4TB',    brand:'致态', brandEn:'ZHITAI', type:'nvme', gen:4, lanes:4, cap:'4T',    read:7400, tdp:8, price:2600 },
     { id:'990pro-4t',    cat:'ssd', name:'三星 990 PRO 4TB',      brand:'三星', brandEn:'Samsung', type:'nvme', gen:4, lanes:4, cap:'4T',    read:7450, tdp:8, price:2900 },
     { id:'ti600-8t',     cat:'ssd', name:'致态 Ti600 8TB',        brand:'致态', brandEn:'ZHITAI', type:'nvme', gen:4, lanes:4, cap:'8T',    read:5000, tdp:9, price:4800, note:'单盘 8T：全模型库+数据集一盘点' },
     { id:'gc-clip-2t',   cat:'ssd', name:'Solidigm P44 Pro 2TB Gen5', brand:'Solidigm', brandEn:'Solidigm', type:'nvme', gen:5, lanes:4, cap:'2T', read:14000, tdp:11, price:2400, note:'Gen5 盘发热大：主板自带马甲或加散热片，否则掉速' },
+    { id:'990evo-2t',    cat:'ssd', name:'三星 990 EVO Plus 2TB', brand:'三星', brandEn:'Samsung', type:'nvme', gen:4, lanes:4, cap:'2T', read:7250, tdp:8, price:1050, note:'名义支持 Gen5 但只有 x2（跑 Gen4 x4 速度 7250MB/s）：便宜大缓，权重盘够用' },
+    { id:'ti600-2t',     cat:'ssd', name:'致态 Ti600 2TB',        brand:'致态', brandEn:'ZHITAI', type:'nvme', gen:4, lanes:4, cap:'2T',    read:7000, tdp:7, price:950, note:'本机同款 2T 档：QLC 大容量权重盘，SLC 外直读 ~1.6GB/s 仍远超流式需求' },
+    { id:'t705-2t',      cat:'ssd', name:'英睿达 T705 2TB Gen5',  brand:'英睿达', brandEn:'Crucial', type:'nvme', gen:5, lanes:4, cap:'2T', read:14500, tdp:12, price:1900, note:'真 Gen5 x4（Phison E31）：顺序 14500MB/s；发热比 Gen4 高一档，必须上马甲' },
     { id:'sata-ssd-1t',  cat:'ssd', name:'镁光 MX500 1TB SATA',   brand:'镁光', brandEn:'Micron', type:'sata_ssd', gen:0, lanes:0, cap:'1T', read:560, tdp:3, price:400, note:'SATA SSD：550MB/s 够冷数据，流式权重会卡' },
     { id:'wd43purz-4t',  cat:'ssd', name:'西数 HC430 4TB 机械盘',  brand:'西数', brandEn:'WD', type:'sata', gen:0, lanes:0, cap:'4T', read:175, tdp:8, price:550, note:'D:/E:同款——机械盘勿放模型热文件（175MB/s会卡权重流式）' },
     { id:'hdd18-16t',    cat:'ssd', name:'Ultrastar HC550 16T 企业盘', brand:'西数', brandEn:'WD', type:'sata', gen:0, lanes:0, cap:'16T', read:260, tdp:10, price:1100, note:'矿渣企业盘 16T：便宜大碗但吵+振动；放数据集可以，别放权重' },
@@ -234,8 +258,11 @@
     { id:'psu-550',   cat:'psu', name:'酷冷 550W 白牌',        brand:'酷冷至尊', brandEn:'Cooler Master', w:550,  cert:'白牌', conn8:2, conn16pin:0, price:180, note:'单卡 650 级以下够用；双卡别碰' },
     { id:'psu-650bm', cat:'psu', name:'海盗船 CX650M 铜牌',     brand:'海盗船', brandEn:'Corsair', w:650,  cert:'铜牌', conn8:3, conn16pin:0, price:350 },
     { id:'psu-750',   cat:'psu', name:'安钛克 750W 金牌',      brand:'安钛克', brandEn:'Antec', w:750,  cert:'金牌', conn8:4, conn16pin:0, price:300 },
+    { id:'psu-750atx31', cat:'psu', name:'海韵 FOCUS GX-750 ATX 3.1 金牌', brand:'海韵', brandEn:'Seasonic', w:750, cert:'金牌', conn8:4, conn16pin:1, price:650, note:'ATX 3.1 原生 12V-2x6：单张 50 系直插免转接；双卡党别拿 750 硬顶' },
     { id:'psu-850g',  cat:'psu', name:'振华 LEADEX III 850W 金牌', brand:'振华', brandEn:'Super Flower', w:850, cert:'金牌', conn8:4, conn16pin:1, price:550 },
+    { id:'psu-850atx31', cat:'psu', name:'微星 MAG A850GL PCIE5 金牌', brand:'微星', brandEn:'MSI', w:850, cert:'金牌', conn8:4, conn16pin:1, price:600, note:'ATX 3.0 原生 12VHPWR（600W 额定）：5080/5090 单卡直插；12V-2x6 修订版接口更耐熔' },
     { id:'psu-1000p', cat:'psu', name:'海韵 FOCUS 1000W 白金',  brand:'海韵', brandEn:'Seasonic', w:1000, cert:'白金', conn8:6, conn16pin:1, price:900 },
+    { id:'psu-1000atx31', cat:'psu', name:'海盗船 RM1000x SHIFT ATX 3.1 金牌', brand:'海盗船', brandEn:'Corsair', w:1000, cert:'金牌', conn8:6, conn16pin:1, price:1100, note:'ATX 3.1 原生 12V-2x6×1：50 系单卡直插；侧置 Type-5 接口走背线清爽，双卡第二张仍要转接' },
     { id:'psu-1200g', cat:'psu', name:'酷冷 V2 1200W 金牌',     brand:'酷冷至尊', brandEn:'Cooler Master', w:1200, cert:'金牌', conn8:6, conn16pin:2, price:800, note:'双 3090/3080 组合的平价答案' },
     { id:'psu-1250t', cat:'psu', name:'海盗船 AX1200i 钛金（现机）', brand:'海盗船', brandEn:'Corsair', w:1250, cert:'钛金', conn8:8, conn16pin:2, price:1500, note:'带3090(350W)+3080(370W)足够' },
     { id:'psu-1600',  cat:'psu', name:'海盗船 AX1600i 钛金',    brand:'海盗船', brandEn:'Corsair', w:1600, cert:'钛金', conn8:10,conn16pin:2, price:2200 },
@@ -248,8 +275,10 @@
     { id:'ag400',     cat:'cooler', name:'利民 AX120 单塔',        brand:'利民', brandEn:'Thermalright', cap:180, type:'air', towers:1, finW:120, fanD:120, towerH:150, price:60 },
     { id:'ak620',     cat:'cooler', name:'九州风神 AK620 双塔',     brand:'九州风神', brandEn:'DeepCool', cap:260, type:'air', towers:2, finW:127, fanD:120, towerH:150, price:180 },
     { id:'pa120se',   cat:'cooler', name:'利民 PA120 SE 双塔',      brand:'利民', brandEn:'Thermalright', cap:260, type:'air', towers:2, finW:125, fanD:120, towerH:150, price:120 },
+    { id:'ps120evo',  cat:'cooler', name:'利民 PS120 EVO 双塔',      brand:'利民', brandEn:'Thermalright', cap:270, type:'air', towers:2, finW:125, fanD:120, towerH:150, price:150, note:'PA120 SE 加强版（幻影战神）：双塔六热管压 14900K PL2 都够，风冷方案F平替' },
     { id:'aio240',    cat:'cooler', name:'240mm 一体水冷',          brand:'利民', brandEn:'Thermalright', cap:280, type:'aio', radLen:270, radFans:2, price:300, note:'中塔顶置兼容性好；解热略强于双塔风冷' },
     { id:'aio360',    cat:'cooler', name:'360mm 一体水冷（现机）',   brand:'利民', brandEn:'Thermalright', cap:350, type:'aio', radLen:380, radFans:3, price:400 },
+    { id:'lt720',     cat:'cooler', name:'九州风神 LT720 360水冷',   brand:'九州风神', brandEn:'DeepCool', cap:330, type:'aio', radLen:380, radFans:3, price:600, note:'白色海景房常客：解热略低于现机 360，胜在泵头颜值' },
     { id:'d15',       cat:'cooler', name:'猫头鹰 NH-D15',           brand:'猫头鹰', brandEn:'Noctua', cap:280, type:'air', towers:2, finW:150, fanD:140, towerH:150, price:380 },
   ];
 
@@ -260,6 +289,7 @@
     { id:'mft3f',   cat:'case', name:'中塔（3前进风扇）',   brand:'先马', brandEn:'Sama', type:'mid',  gpuMaxLen:360, formMax:'ATX',   fans:3, topRad:360, price:200 },
     { id:'pano',    cat:'case', name:'海景房（无柱全景）',   brand:'联力', brandEn:'Lian Li', type:'mid', gpuMaxLen:420, formMax:'ATX',  fans:4, topRad:360, price:600, note:'双面玻璃展示柜：3D 侧透观感最好，积热靠风扇数量补' },
     { id:'ft7f',    cat:'case', name:'全塔（7风扇风道）',   brand:'追风者', brandEn:'Phanteks', type:'full', gpuMaxLen:420, formMax:'E-ATX', fans:7, topRad:420, price:600 },
+    { id:'lc216',   cat:'case', name:'联力 216 网孔中塔',   brand:'联力', brandEn:'Lian Li', type:'mid', gpuMaxLen:392, formMax:'E-ATX', fans:3, topRad:360, price:450, note:'全网孔风道王：标配 2×160 前扇，限长 392mm 装不下 4090/5090 加长卡；E-ATX 只吃 280mm 宽以内的板' },
   ];
 
   /* ---------------- 权重档位（Strata 侧设置） ---------------- */

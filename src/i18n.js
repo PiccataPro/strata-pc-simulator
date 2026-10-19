@@ -128,7 +128,21 @@
       "海盗船 AX1600i 钛金": "Corsair AX1600i Titanium",
       "九州风神 AK620 双塔": "DeepCool AK620 (dual tower)",
       "240mm 一体水冷": "240mm AIO",
-      "海景房（无柱全景）": "Fishbowl (pillarless panoramic)"
+      "海景房（无柱全景）": "Fishbowl (pillarless panoramic)",
+      /* ---- 2026-10-19 配件扩充（parts-lead）---- */
+      "DDR5 32G 6400 幻锋戟": "DDR5 32G 6400 Trident Z5",
+      "DDR5 24G 7200 焰锋戟": "DDR5 24G 7200 Flare X5",
+      "DDR4 16G 3600 白色马甲": "DDR4 16G 3600 white heatspreader",
+      "三星 SN7100 1TB": "Samsung SN7100 1TB",
+      "三星 990 EVO Plus 2TB": "Samsung 990 EVO Plus 2TB",
+      "致态 Ti600 2TB": "ZHITAI Ti600 2TB",
+      "英睿达 T705 2TB Gen5": "Crucial T705 2TB Gen5",
+      "海韵 FOCUS GX-750 ATX 3.1 金牌": "Seasonic FOCUS GX-750 ATX 3.1 Gold",
+      "微星 MAG A850GL PCIE5 金牌": "MSI MAG A850GL PCIE5 Gold",
+      "海盗船 RM1000x SHIFT ATX 3.1 金牌": "Corsair RM1000x SHIFT ATX 3.1 Gold",
+      "利民 PS120 EVO 双塔": "Thermalright PS120 EVO (dual tower)",
+      "九州风神 LT720 360水冷": "DeepCool LT720 360 AIO",
+      "联力 216 网孔中塔": "Lian Li 216 mesh mid tower"
   };
   const NOTE_EN = {
       "6P无E核，并发弱；带核显": "6P, no E-cores — weak concurrency; has an iGPU",
@@ -197,7 +211,38 @@
       "单卡 650 级以下够用；双卡别碰": "Enough for a single card up to the 650W class; don't even try dual GPUs",
       "双 3090/3080 组合的平价答案": "The budget-friendly answer for a dual 3090/3080 build",
       "中塔顶置兼容性好；解热略强于双塔风冷": "Good top-mount compatibility in mid-towers; cools slightly better than a dual-tower air cooler",
-      "双面玻璃展示柜：3D 侧透观感最好，积热靠风扇数量补": "A double-sided glass display case: the best panoramic view in 3D; you make up for the heat with extra fans"
+      "双面玻璃展示柜：3D 侧透观感最好，积热靠风扇数量补": "A double-sided glass display case: the best panoramic view in 3D; you make up for the heat with extra fans",
+      /* ---- 2026-10-19 配件扩充（parts-lead）---- */
+      "12100 的无核显版：更便宜，但亮机必须独卡": "The iGPU-less cut of the 12100: cheaper, but you need a discrete GPU just to POST",
+      "13400F 同构马甲：6P+4E/16T，非K 低压档缩缸风险小": "A rebadge of the 13400F: 6P+4E/16T; the non-K low-voltage tier has little degradation risk",
+      "12代特挑大核 5.5GHz：12代无缩缸门，比13/14代i9二手更稳": "Binned 12th-gen cores at 5.5 GHz; the 12th gen dodged the degradation scandal, so used units are safer than 13/14-gen i9s",
+      "5600 降频版且直连只有 PCIe3.0（同 5600G 砍核显）：亮机可以，副卡链路更慢": "A downclocked 5600 whose direct link is PCIe 3.0 only (same silicon as the 5600G minus the iGPU): fine for POSTing, slower second-GPU link",
+      "5600 高频版：同为 Zen3 6C12T，二手价差很小": "The higher-clocked 5600: same Zen 3 6C/12T; the used price gap is tiny",
+      "96MB 3D缓存的平价版 5800X3D：游戏接近，LLM 同样吃不到 3D 缓存": "The budget 5800X3D with 96MB of 3D cache: near-identical gaming, and LLM workloads still can't use the cache",
+      "AM4 末代 16C32T：线程多但 Zen3 IPC 老，LLM 场景不如 9950X": "AM4's swan song, 16C/32T: lots of threads but old Zen 3 IPC — the 9950X is better for LLM work",
+      "Zen5 入门 6C12T：AVX-512 一样不缺，缺的只是核数": "Entry Zen 5, 6C/12T: nothing missing from AVX-512, only cores",
+      "12C24T + 140MB 缓存：X3D 对 LLM 推理加成依旧有限，贵的是游戏税": "12C/24T with 140MB of cache: X3D still adds little to LLM inference — the premium is a gaming tax",
+      "16C32T + 144MB 缓存：AM5 游戏旗舰；LLM 推理与 9950X 几乎无差，差价是游戏税": "16C/32T with 144MB of cache: AM5's gaming flagship; for LLM inference it's a hair off the 9950X — the price gap is a gaming tax",
+      "GDDR7 甜品卡：8G 显存装不下 KV+expert 预算，只配亮机/副卡": "GDDR7 sweet-spot card: 8G of VRAM can't cover the KV + expert budget — it's a POST/secondary card at best",
+      "16G 便宜但 448GB/s 带宽是小水管（同 4060Ti 16G 的 GDDR7 版）：容量够、喂不饱": "16G on the cheap but 448 GB/s is a garden hose (the GDDR7 edition of the 4060 Ti 16G): enough capacity, starved pipeline",
+      "AMD 官方规格：32CU/3130MHz/320GB/s/160W——16G 白菜价，但 320GB/s 带宽+Vulkan 折损双debuff": "AMD's own spec: 32 CU / 3130 MHz / 320 GB/s / 160 W — 16G for pennies, but 320 GB/s plus the Vulkan penalty is a double debuff",
+      "AMD 官方规格：56CU/2520MHz/640GB/s/220W——比 9070XT 便宜一档，带宽相同，算力低些": "AMD's own spec: 56 CU / 2520 MHz / 640 GB/s / 220 W — a tier below the 9070 XT: same bandwidth, less compute",
+      "FURY Beast 8G×2 双通道亮机组合；125B 的死穴是容量不是频率，别为马甲多花钱": "FURY Beast 8G×2 dual-channel boot kit; for 125B the killer is capacity, not speed — don't pay extra for heatspreaders",
+      "FURY Beast 单条 32G：AM4 堆 64G 比 DDR5 便宜一半，代价是带宽上限": "FURY Beast single 32G: AM4 can stack 64G for half the DDR5 price — the cost is a bandwidth ceiling",
+      "Trident Z5 6400 CL32：Intel Z790 高频甜点；AM5 上超 6000 无收益（1:1 墙）": "Trident Z5 6400 CL32: the high-speed sweet spot on Intel Z790; past 6000 on AM5 buys nothing (the 1:1 wall)",
+      "Flare X5 24G×2 套条拆卖（EXPO CL34）：7200 高频，但 AM5 甜点在 6000——超 6000 进 1:2 模式，LLM 场景反而亏": "Flare X5 24G×2 kit sold loose (EXPO CL34): 7200 MT/s, but the AM5 sweet spot is 6000 — past that it drops to 1:2 mode and LLM workloads actually lose",
+      "FURY Beast 48G 单条：两条 96G 只占 2 槽——比 16+32 混插更干净的 96G 方案": "FURY Beast single 48G: two sticks make 96G in just 2 slots — a cleaner 96G plan than 16+32 mixing",
+      "复仇者 LPX 白：白色 AM4 主题装机用，频率时序与黑版 3600 相同": "Vengeance LPX White: for white AM4 builds — same speed and timings as the black 3600",
+      "SN770 后继款：TLC 无缓高性价比，权重流式读 SLC 内 ~5GB/s": "Successor to the SN770: DRAM-less TLC value king, ~5 GB/s streaming weights inside SLC",
+      "名义支持 Gen5 但只有 x2（跑 Gen4 x4 速度 7250MB/s）：便宜大缓，权重盘够用": "Gen5 on paper but only x2 (it runs Gen4 x4 speeds at 7250 MB/s): cheap with a big SLC cache — plenty for a weights drive",
+      "本机同款 2T 档：QLC 大容量权重盘，SLC 外直读 ~1.6GB/s 仍远超流式需求": "The 2TB version of this machine's drive: QLC big-capacity weights disk — even outside SLC it reads ~1.6 GB/s, far above streaming needs",
+      "真 Gen5 x4（Phison E31）：顺序 14500MB/s；发热比 Gen4 高一档，必须上马甲": "A real Gen5 x4 (Phison E31): 14,500 MB/s sequential; runs a tier hotter than Gen4 — a heatspreader is mandatory",
+      "ATX 3.1 原生 12V-2x6：单张 50 系直插免转接；双卡党别拿 750 硬顶": "ATX 3.1 with a native 12V-2x6: one 50-series card plugs straight in; dual-GPU folks, don't force a 750W",
+      "ATX 3.0 原生 12VHPWR（600W 额定）：5080/5090 单卡直插；12V-2x6 修订版接口更耐熔": "ATX 3.0 native 12VHPWR (600W rated): a single 5080/5090 plugs straight in; the 12V-2x6 revision resists melting better",
+      "ATX 3.1 原生 12V-2x6×1：50 系单卡直插；侧置 Type-5 接口走背线清爽，双卡第二张仍要转接": "ATX 3.1 with one native 12V-2x6: a single 50-series card plugs straight in; the side-mounted Type-5 panel keeps cables tidy, but a second GPU still needs an adapter",
+      "PA120 SE 加强版（幻影战神）：双塔六热管压 14900K PL2 都够，风冷方案F平替": "The beefed-up PA120 SE: dual towers, six heatpipes — enough for a 14900K at PL2; the air-cooled stand-in for plan F",
+      "白色海景房常客：解热略低于现机 360，胜在泵头颜值": "A regular in white fishbowl builds: cools slightly below the current 360, wins on pump-head looks",
+      "全网孔风道王：标配 2×160 前扇，限长 392mm 装不下 4090/5090 加长卡；E-ATX 只吃 280mm 宽以内的板": "The all-mesh airflow king: ships with 2×160 front fans; the 392 mm GPU limit won't fit long 4090/5090 cards; E-ATX only up to 280 mm board width"
   };
   /* 显示用：英文模式下查表，中文模式原样 */
   window.DN = function (txt) {

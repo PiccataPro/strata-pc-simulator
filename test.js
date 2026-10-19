@@ -189,15 +189,15 @@ check('显卡筛选字段齐全(vendor/series/vram)', gpuMiss.length === 0, gpuM
 
 console.log('=== 分级筛选（filterParts 纯函数） ===');
 /* 逐层命中：品牌→代系→档位 */
-check('筛选 CPU=Intel 命中12', P.filterParts('cpu', P.cpus, { brand: 'Intel' }).length === 12, 'count=' + P.filterParts('cpu', P.cpus, { brand: 'Intel' }).length);
+check('筛选 CPU=Intel 命中15', P.filterParts('cpu', P.cpus, { brand: 'Intel' }).length === 15, 'count=' + P.filterParts('cpu', P.cpus, { brand: 'Intel' }).length);
 check('筛选 CPU=Intel→13代 命中4款', P.filterParts('cpu', P.cpus, { brand: 'Intel', gen: '13代' }).map(c => c.id).sort().join(',') === 'i5-13400F,i5-13600KF,i7-13700KF,i9-13900KF', P.filterParts('cpu', P.cpus, { brand: 'Intel', gen: '13代' }).map(c => c.id).join(','));
-check('筛选 CPU=Intel→i5 命中4款', P.filterParts('cpu', P.cpus, { brand: 'Intel', tier: 'i5' }).length === 4, P.filterParts('cpu', P.cpus, { brand: 'Intel', tier: 'i5' }).map(c => c.id).join(','));
-/* 显卡阵营：A 卡 5 款 */
-check('筛选 显卡=A卡 命中5款', P.filterParts('gpu', P.gpus, { vendor: 'A 卡' }).length === 5, P.filterParts('gpu', P.gpus, { vendor: 'A 卡' }).map(g => g.id).join(','));
+check('筛选 CPU=Intel→i5 命中5款', P.filterParts('cpu', P.cpus, { brand: 'Intel', tier: 'i5' }).length === 5, P.filterParts('cpu', P.cpus, { brand: 'Intel', tier: 'i5' }).map(c => c.id).join(','));
+/* 显卡阵营：A 卡 7 款 */
+check('筛选 显卡=A卡 命中7款', P.filterParts('gpu', P.gpus, { vendor: 'A 卡' }).length === 7, P.filterParts('gpu', P.gpus, { vendor: 'A 卡' }).map(g => g.id).join(','));
 check('筛选 显卡=N卡 无A卡混入', P.filterParts('gpu', P.gpus, { vendor: 'N 卡' }).every(g => g.vendor === 'nvidia'), 'count=' + P.filterParts('gpu', P.gpus, { vendor: 'N 卡' }).length);
 /* 内存代际 */
-check('筛选 内存=DDR4 命中5', P.filterParts('ram', P.dimms, { gen: '4' }).length === 5, 'count=' + P.filterParts('ram', P.dimms, { gen: '4' }).length);
-check('筛选 内存=DDR5 命中8', P.filterParts('ram', P.dimms, { gen: '5' }).length === 8, 'count=' + P.filterParts('ram', P.dimms, { gen: '5' }).length);
+check('筛选 内存=DDR4 命中8', P.filterParts('ram', P.dimms, { gen: '4' }).length === 8, 'count=' + P.filterParts('ram', P.dimms, { gen: '4' }).length);
+check('筛选 内存=DDR5 命中11', P.filterParts('ram', P.dimms, { gen: '5' }).length === 11, 'count=' + P.filterParts('ram', P.dimms, { gen: '5' }).length);
 /* 主板品牌→平台 */
 check('筛选 主板=华硕→AM5 命中2', P.filterParts('mobo', P.mobos, { brand: '华硕', platform: 'AM5' }).map(m => m.id).sort().join(',') === 'x670e-evo,x870e-creator', P.filterParts('mobo', P.mobos, { brand: '华硕', platform: 'AM5' }).map(m => m.id).join(','));
 /* opts 动态去重 + 排序：菜单自动长出来，不用维护两份 */

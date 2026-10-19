@@ -1,7 +1,7 @@
 /* 分级筛选菜单 UI 探针：真点击 chips，验证级联显隐/过滤命中/取消清深层/mismatch 置灰/动态去重。
    用法：node scripts/probe_filter.cjs [baseUrl]
    货架 DOM：#shelfL=[cpu,mobo,ram,gpu]，#shelfR=[ssd,psu,cooler,case]（CATS 顺序对半）
-   断言数字来自 node 直查 parts.js：CPU 28(Intel12/AMD16)、GPU 23(AMD5)、mismatch 板11/条5。 */
+   断言数字来自 node 直查 parts.js：CPU 38(Intel15/AMD23)、GPU 27(AMD7)、mismatch 板11/条8。 */
 'use strict';
 const puppeteer = require('puppeteer-core');
 const BASE = process.argv[2] || 'http://127.0.0.1:8901';
@@ -44,17 +44,17 @@ const T = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '  PASS
   let s = await sec('#shelfL', 0);
   T('CPU 初始只有品牌行（级联隐藏下级）', s.rows.length === 1 && s.rows[0][0] === '全部', s.rows);
   T('CPU 品牌行含 Intel/AMD', s.rows[0].includes('Intel') && s.rows[0].includes('AMD'), s.rows[0]);
-  T('CPU 全量=28', s.parts.length === 28, s.parts.length);
+  T('CPU 全量=38', s.parts.length === 38, s.parts.length);
 
   await clickChip('#shelfL', 0, 0, 'Intel');
   s = await sec('#shelfL', 0);
   T('选 Intel 后平台行出现', s.rows.length === 2, s.rows.map(r => r.length));
-  T('Intel 过滤命中 12 款', s.parts.length === 12, s.parts.length);
+  T('Intel 过滤命中 15 款', s.parts.length === 15, s.parts.length);
 
   await clickChip('#shelfL', 0, 1, 'LGA1700');
   s = await sec('#shelfL', 0);
   T('选 LGA1700 后代系行出现', s.rows.length === 3, s.rows.map(r => r.length));
-  T('LGA1700 命中 12 款', s.parts.length === 12, s.parts.length);
+  T('LGA1700 命中 15 款', s.parts.length === 15, s.parts.length);
 
   await clickChip('#shelfL', 0, 2, '13代');
   s = await sec('#shelfL', 0);
@@ -64,7 +64,7 @@ const T = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '  PASS
   await clickChip('#shelfL', 0, 3, 'i5');
   s = await sec('#shelfL', 0);
   T('i5 命中 2 款(13400F/13600KF)', s.parts.length === 2 && s.parts.every(x => /13[46]00/.test(x.id)), s.parts.map(x => x.id));
-  T('计数显示 2/28', s.fcnt === '2/28', s.fcnt);
+  T('计数显示 2/38', s.fcnt === '2/38', s.fcnt);
 
   await clickChip('#shelfL', 0, 3, 'i5');   // 再点=取消本级
   s = await sec('#shelfL', 0);
@@ -74,18 +74,18 @@ const T = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '  PASS
   await clickChip('#shelfL', 0, 0, 'AMD');  // 换品牌=清深层
   s = await sec('#shelfL', 0);
   T('切 AMD 深层清空只剩平台行', s.rows.length === 2, s.rows.map(r => r.length));
-  T('AMD 命中 16 款', s.parts.length === 16, s.parts.length);
+  T('AMD 命中 23 款', s.parts.length === 23, s.parts.length);
 
   /* ---- 显卡货架（#shelfL h3[3]）：A卡/N卡 分流 ---- */
   s = await sec('#shelfL', 3);
-  T('GPU 初始 23 款', s.parts.length === 23, s.parts.length);
+  T('GPU 初始 27 款', s.parts.length === 27, s.parts.length);
   await clickChip('#shelfL', 3, 0, 'A 卡');
   s = await sec('#shelfL', 3);
-  T('A 卡命中 5 款', s.parts.length === 5, s.parts.map(x => x.id));
+  T('A 卡命中 7 款', s.parts.length === 7, s.parts.map(x => x.id));
   T('A 卡规格行带 Vulkan 标注', s.parts.every(x => x.txt.includes('A卡(Vulkan)')), s.parts[0] && s.parts[0].txt.slice(0, 80));
   await clickChip('#shelfL', 3, 0, '全部');
   s = await sec('#shelfL', 3);
-  T('全部恢复 23 款', s.parts.length === 23, s.parts.length);
+  T('全部恢复 27 款', s.parts.length === 27, s.parts.length);
 
   /* ---- 主板 mismatch：默认 CPU=i7-12700KF(LGA1700)，非 LGA1700 板应置灰 ---- */
   s = await sec('#shelfL', 1);
@@ -95,14 +95,14 @@ const T = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '  PASS
   /* ---- 内存 mismatch：默认主板 DDR5，DDR4 条应置灰 ---- */
   s = await sec('#shelfL', 2);
   const ramMm = s.parts.filter(x => x.mm).map(x => x.id);
-  T('内存 DDR4(5款) 对 DDR5 主板置灰', ramMm.length === 5 && ramMm.every(x => x.startsWith('d4-')), ramMm);
+  T('内存 DDR4(8款) 对 DDR5 主板置灰', ramMm.length === 8 && ramMm.every(x => x.startsWith('d4-')), ramMm);
 
   /* ---- 动态去重：选 DDR5 后容量行不应出现 8G（8G 仅 DDR4 有货）---- */
   await clickChip('#shelfL', 2, 0, '5');
   s = await sec('#shelfL', 2);
   const sizeRow = s.rows[1] || [];
   T('DDR5 容量行动态去重（无 8G，含 16G/32G）', !sizeRow.includes('8G') && sizeRow.includes('16G') && sizeRow.includes('32G'), sizeRow);
-  T('DDR5 命中 8 款', s.parts.length === 8, s.parts.length);
+  T('DDR5 命中 11 款', s.parts.length === 11, s.parts.length);
 
   console.log('\nerrors:', errs.length ? errs.join(' | ') : '无');
   console.log('===== probe_filter: ' + pass + ' PASS / ' + fail + ' FAIL =====');
