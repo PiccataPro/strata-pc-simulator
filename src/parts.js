@@ -80,6 +80,10 @@
    * 槽位电气全部按 2026-10 官网规格页核实，查不到官方口径的板子不收录 */
   const mobos = [
     /* Intel LGA1700 */
+    { id:'h610m-a-d4', cat:'mobo', name:'华硕 PRIME H610M-A D4', brand:'华硕', brandEn:'ASUS', platform:'LGA1700', chipset:'H610', socket:'LGA1700', ddr:'4', form:'mATX',
+      slots:[{pos:1,lanes:16,src:'cpu',gen:4},{pos:2,lanes:1,src:'chipset',gen:3}], dual:[16,1], slotsTotal:2,
+      m2:2, m2Share:null, memSlots:2, memChan:['A','B'], chipLanes:8, price:350,
+      note:'亮机底价板：第二槽只有芯片组 Gen3 x1（0.99GB/s→frac 0.03），插第二张卡纯属行为艺术；2 DIMM 上限 64G，125B expert arena 直接判死刑' },
     { id:'b660m-mortar-ddr4', cat:'mobo', name:'微星 MAG B660M MORTAR DDR4', brand:'微星', brandEn:'MSI', platform:'LGA1700', chipset:'B660', socket:'LGA1700', ddr:'4', form:'mATX',
       slots:[{pos:1,lanes:16,src:'cpu',gen:4},{pos:2,lanes:4,src:'chipset',gen:3}], dual:[16,4], slotsTotal:2,
       m2:2, m2Share:null, memSlots:4, memChan:['A','A','B','B'], chipLanes:8, price:450,
@@ -88,6 +92,10 @@
       slots:[{pos:1,lanes:16,src:'cpu',gen:4},{pos:2,lanes:4,src:'chipset',gen:3}], dual:[16,4], slotsTotal:2,
       m2:2, m2Share:null, memSlots:4, memChan:['A','A','B','B'], chipLanes:8, price:400,
       note:'性价比板但双卡第二槽=芯片组x4 Gen3（3.9GB/s，比现板还慢一半）' },
+    { id:'mpg-b760i-edge', cat:'mobo', name:'微星 MPG B760I EDGE WIFI', brand:'微星', brandEn:'MSI', platform:'LGA1700', chipset:'B760', socket:'LGA1700', ddr:'5', form:'ITX',
+      slots:[{pos:1,lanes:16,src:'cpu',gen:5}], dual:null, slotsTotal:1,
+      m2:2, m2Share:null, memSlots:2, memChan:['A','B'], chipLanes:8, price:1000,
+      note:'ITX 小钢炮：单卡位没有双卡选项，但主槽 CPU 直连 Gen5 x16 满血；2 DIMM 上限 64G，堆内存前先想清楚' },
     { id:'z790-gaming-plus', cat:'mobo', name:'微星 Z790 GAMING PLUS WIFI', brand:'微星', brandEn:'MSI', platform:'LGA1700', chipset:'Z790', socket:'LGA1700', ddr:'5', form:'ATX',
       slots:[{pos:1,lanes:16,src:'cpu',gen:4},{pos:4,lanes:4,src:'chipset',gen:4}], dual:[16,4], slotsTotal:2,
       m2:3, m2Share:null, memSlots:4, memChan:['A','A','B','B'], chipLanes:12, price:900,
@@ -108,7 +116,15 @@
       slots:[{pos:1,lanes:16,src:'cpu',gen:5},{pos:4,lanes:8,src:'cpu',gen:5}], dual:[8,8], slotsTotal:3,
       m2:4, m2Share:null, memSlots:4, memChan:['A','A','B','B'], chipLanes:12, price:2400,
       note:'同Taichi：x8/x8 CPU直连；二手¥2,000-2,600' },
+    { id:'maximus-z790-hero', cat:'mobo', name:'华硕 ROG MAXIMUS Z790 HERO', brand:'华硕', brandEn:'ASUS', platform:'LGA1700', chipset:'Z790', socket:'LGA1700', ddr:'5', form:'ATX',
+      slots:[{pos:1,lanes:16,src:'cpu',gen:5},{pos:4,lanes:16,src:'cpu',gen:5},{pos:6,lanes:4,src:'chipset',gen:4}], dual:[8,8], slotsTotal:3,
+      m2:3, m2Share:null, memSlots:4, memChan:['A','A','B','B'], chipLanes:12, price:3000,
+      note:'Z790 旗舰双卡正解：官网槽位表两条 CPU 直连 Gen5 x16，双卡拆 x8/x8（各31.5GB/s→frac 满分），第三槽芯片组 Gen4 x4；Hyper M.2 扩展卡会占掉一条 x16——三卡党先看槽位表' },
     /* AMD AM4 */
+    { id:'a320m-k', cat:'mobo', name:'华硕 PRIME A320M-K', brand:'华硕', brandEn:'ASUS', platform:'AM4', chipset:'A320', socket:'AM4', ddr:'4', form:'mATX',
+      slots:[{pos:1,lanes:16,src:'cpu',gen:3}], dual:null, slotsTotal:1,
+      m2:1, m2Share:null, memSlots:2, memChan:['A','B'], chipLanes:4, price:200,
+      note:'AM4 最老最白菜：单卡位+2 DIMM（上限64G），x16 槽还是 Gen3；官网那个 "dual x8" 是第一槽 bifurcation 给 Hyper M.2 扩展卡用的，装不了第二张显卡——别被字面骗了' },
     { id:'b450m-pro4', cat:'mobo', name:'华擎 B450M Pro4', brand:'华擎', brandEn:'ASRock', platform:'AM4', chipset:'B450', socket:'AM4', ddr:'4', form:'mATX',
       slots:[{pos:1,lanes:16,src:'cpu',gen:3}], dual:null, slotsTotal:1,
       m2:2, m2Share:null, memSlots:4, memChan:['A','A','B','B'], chipLanes:6, price:250,
@@ -122,6 +138,10 @@
       m2:3, m2Share:null, memSlots:4, memChan:['A','A','B','B'], chipLanes:12, price:1400,
       note:'AM4 双卡正解：CPU 直连 x16/x8 拆分 Gen4（双卡各 x8≈15.7GB/s→frac 0.5）；二手¥1,200-1,600' },
     /* AMD AM5 */
+    { id:'pro-a620m-e', cat:'mobo', name:'微星 PRO A620M-E', brand:'微星', brandEn:'MSI', platform:'AM5', chipset:'A620', socket:'AM5', ddr:'5', form:'mATX',
+      slots:[{pos:1,lanes:16,src:'cpu',gen:4},{pos:2,lanes:1,src:'chipset',gen:3}], dual:[16,1], slotsTotal:2,
+      m2:1, m2Share:null, memSlots:2, memChan:['A','B'], chipLanes:6, price:450,
+      note:'AM5 亮机板：2 DIMM（上限64G）——96G 党绕道；主槽 CPU 直连 Gen4 x16 满血，第二槽只有 Gen3 x1（0.99GB/s→frac 0.03）别想双卡，配 9600X 单卡方案最省钱' },
     { id:'b650m-pro', cat:'mobo', name:'微星 B650M PRO', brand:'微星', brandEn:'MSI', platform:'AM5', chipset:'B650', socket:'AM5', ddr:'5', form:'mATX',
       slots:[{pos:1,lanes:16,src:'cpu',gen:4},{pos:2,lanes:4,src:'chipset',gen:4}], dual:[16,4], slotsTotal:2,
       m2:2, m2Share:null, memSlots:2, memChan:['A','B'], chipLanes:8, price:500,
@@ -130,6 +150,14 @@
       slots:[{pos:1,lanes:16,src:'cpu',gen:4},{pos:4,lanes:2,src:'chipset',gen:4}], dual:[16,2], slotsTotal:2,
       m2:3, m2Share:null, memSlots:4, memChan:['A','A','B','B'], chipLanes:8, price:900,
       note:'新式坑：第二槽物理 x16 大长槽，电气只有芯片组 x2（3.9GB/s→frac 0.12）——槽长骗眼睛，规格页才说实话' },
+    { id:'b850m-mortar-wifi', cat:'mobo', name:'微星 MAG B850M MORTAR WIFI', brand:'微星', brandEn:'MSI', platform:'AM5', chipset:'B850', socket:'AM5', ddr:'5', form:'mATX',
+      slots:[{pos:1,lanes:16,src:'cpu',gen:5},{pos:2,lanes:4,src:'chipset',gen:4}], dual:[16,4], slotsTotal:2,
+      m2:3, m2Share:null, memSlots:4, memChan:['A','A','B','B'], chipLanes:8, price:1300,
+      note:'AM5 新中端主力：主槽 Gen5 x16 满血+双 CPU 直连 Gen5 M.2，但第二槽仍是芯片组 Gen4 x4（6.6GB/s→frac0.18，同现板坑）——B850 不是 E 级，双卡党别按芯片组名字下菜' },
+    { id:'x870-tomahawk', cat:'mobo', name:'微星 MAG X870 TOMAHAWK WIFI', brand:'微星', brandEn:'MSI', platform:'AM5', chipset:'X870', socket:'AM5', ddr:'5', form:'ATX',
+      slots:[{pos:1,lanes:16,src:'cpu',gen:5},{pos:2,lanes:1,src:'chipset',gen:3},{pos:3,lanes:4,src:'chipset',gen:4}], dual:[16,1], slotsTotal:3,
+      m2:4, m2Share:{m2:'M.2_3', slot:3, toLanes:2}, memSlots:4, memChan:['A','A','B','B'], chipLanes:12, price:1850,
+      note:'X870 非 E 的真相：官网槽位表第二槽只有芯片组 Gen3 x1（0.99GB/s→frac 0.03），第三槽 Gen4 x4 还会被 M2_3 装盘抢成 x2——想要 CPU 直连 x8/x8 还得是 E 级板' },
     { id:'x670e-evo', cat:'mobo', name:'华硕 ROG X670E-E GAMING', brand:'华硕', brandEn:'ASUS', platform:'AM5', chipset:'X670E', socket:'AM5', ddr:'5', form:'ATX',
       slots:[{pos:1,lanes:16,src:'cpu',gen:5},{pos:4,lanes:8,src:'cpu',gen:5}], dual:[8,8], slotsTotal:3,
       m2:4, m2Share:null, memSlots:4, memChan:['A','A','B','B'], chipLanes:12, price:2300,
@@ -290,6 +318,9 @@
     { id:'pano',    cat:'case', name:'海景房（无柱全景）',   brand:'联力', brandEn:'Lian Li', type:'mid', gpuMaxLen:420, formMax:'ATX',  fans:4, topRad:360, price:600, note:'双面玻璃展示柜：3D 侧透观感最好，积热靠风扇数量补' },
     { id:'ft7f',    cat:'case', name:'全塔（7风扇风道）',   brand:'追风者', brandEn:'Phanteks', type:'full', gpuMaxLen:420, formMax:'E-ATX', fans:7, topRad:420, price:600 },
     { id:'lc216',   cat:'case', name:'联力 216 网孔中塔',   brand:'联力', brandEn:'Lian Li', type:'mid', gpuMaxLen:392, formMax:'E-ATX', fans:3, topRad:360, price:450, note:'全网孔风道王：标配 2×160 前扇，限长 392mm 装不下 4090/5090 加长卡；E-ATX 只吃 280mm 宽以内的板' },
+    { id:'antec-c8', cat:'case', name:'安钛克 C8 ARGB 海景房', brand:'安钛克', brandEn:'Antec', type:'full', gpuMaxLen:440, formMax:'E-ATX', fans:3, topRad:360, price:550, note:'双舱海景房全塔：限长 440 吃得下 5090，顶/底/侧三处 360 冷排位；标配 2×160 反叶+1×140 后扇；E-ATX 只吃 280mm 宽以内的板' },
+    { id:'fd-north', cat:'case', name:'分形工艺 North 木纹网孔', brand:'分形工艺', brandEn:'Fractal Design', type:'mid', gpuMaxLen:355, formMax:'ATX', fans:2, topRad:240, price:900, note:'胡桃木+网孔的设计师款：标配 2×140 风道安静；坑在顶部只到 240——360 冷排只能装前面，装完限长降到 300，5090/4090 直接出局' },
+    { id:'enthoo-pro2', cat:'case', name:'追风者 Enthoo Pro 2 全塔', brand:'追风者', brandEn:'Phanteks', type:'full', gpuMaxLen:503, formMax:'E-ATX', fans:0, topRad:360, price:700, note:'水冷改装床：限长 503 通吃现售所有卡，前 480/侧 480/顶 360 五冷排位；注意裸箱不配任何风扇，风冷方案先留一笔扇钱' },
   ];
 
   /* ---------------- 权重档位（Strata 侧设置） ---------------- */

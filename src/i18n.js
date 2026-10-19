@@ -142,7 +142,18 @@
       "海盗船 RM1000x SHIFT ATX 3.1 金牌": "Corsair RM1000x SHIFT ATX 3.1 Gold",
       "利民 PS120 EVO 双塔": "Thermalright PS120 EVO (dual tower)",
       "九州风神 LT720 360水冷": "DeepCool LT720 360 AIO",
-      "联力 216 网孔中塔": "Lian Li 216 mesh mid tower"
+      "联力 216 网孔中塔": "Lian Li 216 mesh mid tower",
+      /* ---- 2026-10-19 主板/机箱扩充（mobo-case-lead）---- */
+      "华硕 PRIME H610M-A D4": "ASUS PRIME H610M-A D4",
+      "微星 MPG B760I EDGE WIFI": "MSI MPG B760I EDGE WIFI",
+      "华硕 ROG MAXIMUS Z790 HERO": "ASUS ROG MAXIMUS Z790 HERO",
+      "华硕 PRIME A320M-K": "ASUS PRIME A320M-K",
+      "微星 PRO A620M-E": "MSI PRO A620M-E",
+      "微星 MAG B850M MORTAR WIFI": "MSI MAG B850M MORTAR WIFI",
+      "微星 MAG X870 TOMAHAWK WIFI": "MSI MAG X870 TOMAHAWK WIFI",
+      "安钛克 C8 ARGB 海景房": "Antec C8 ARGB fishbowl",
+      "分形工艺 North 木纹网孔": "Fractal Design North wood & mesh",
+      "追风者 Enthoo Pro 2 全塔": "Phanteks Enthoo Pro 2 full tower"
   };
   const NOTE_EN = {
       "6P无E核，并发弱；带核显": "6P, no E-cores — weak concurrency; has an iGPU",
@@ -242,7 +253,18 @@
       "ATX 3.1 原生 12V-2x6×1：50 系单卡直插；侧置 Type-5 接口走背线清爽，双卡第二张仍要转接": "ATX 3.1 with one native 12V-2x6: a single 50-series card plugs straight in; the side-mounted Type-5 panel keeps cables tidy, but a second GPU still needs an adapter",
       "PA120 SE 加强版（幻影战神）：双塔六热管压 14900K PL2 都够，风冷方案F平替": "The beefed-up PA120 SE: dual towers, six heatpipes — enough for a 14900K at PL2; the air-cooled stand-in for plan F",
       "白色海景房常客：解热略低于现机 360，胜在泵头颜值": "A regular in white fishbowl builds: cools slightly below the current 360, wins on pump-head looks",
-      "全网孔风道王：标配 2×160 前扇，限长 392mm 装不下 4090/5090 加长卡；E-ATX 只吃 280mm 宽以内的板": "The all-mesh airflow king: ships with 2×160 front fans; the 392 mm GPU limit won't fit long 4090/5090 cards; E-ATX only up to 280 mm board width"
+      "全网孔风道王：标配 2×160 前扇，限长 392mm 装不下 4090/5090 加长卡；E-ATX 只吃 280mm 宽以内的板": "The all-mesh airflow king: ships with 2×160 front fans; the 392 mm GPU limit won't fit long 4090/5090 cards; E-ATX only up to 280 mm board width",
+      /* ---- 2026-10-19 主板/机箱扩充（mobo-case-lead）---- */
+      "亮机底价板：第二槽只有芯片组 Gen3 x1（0.99GB/s→frac 0.03），插第二张卡纯属行为艺术；2 DIMM 上限 64G，125B expert arena 直接判死刑": "The rock-bottom POST board: slot 2 is just chipset Gen3 x1 (0.99 GB/s → frac 0.03) — a second GPU there is performance art; 2 DIMMs capped at 64G, a death sentence for the 125B expert arena",
+      "ITX 小钢炮：单卡位没有双卡选项，但主槽 CPU 直连 Gen5 x16 满血；2 DIMM 上限 64G，堆内存前先想清楚": "The ITX hot rod: one slot, no dual-GPU story, but the primary slot is a full CPU-attached Gen5 x16; 2 DIMMs capped at 64G — think before dreaming of big RAM",
+      "Z790 旗舰双卡正解：官网槽位表两条 CPU 直连 Gen5 x16，双卡拆 x8/x8（各31.5GB/s→frac 满分），第三槽芯片组 Gen4 x4；Hyper M.2 扩展卡会占掉一条 x16——三卡党先看槽位表": "The right Z790 flagship for dual GPUs: per the spec page two CPU-attached Gen5 x16 slots, x8/x8 under dual load (31.5 GB/s each → full frac), slot 3 is chipset Gen4 x4; the Hyper M.2 card eats one x16 — three-GPU folks, read the slot table first",
+      "AM4 最老最白菜：单卡位+2 DIMM（上限64G），x16 槽还是 Gen3；官网那个 \"dual x8\" 是第一槽 bifurcation 给 Hyper M.2 扩展卡用的，装不了第二张显卡——别被字面骗了": "AM4's oldest bargain bin: one GPU slot, 2 DIMMs (64G max), and the x16 slot is still Gen3; that \"dual x8\" on the spec page is slot 1 bifurcation for a Hyper M.2 card — it will not take a second GPU. Don't get fooled by the wording",
+      "AM5 亮机板：2 DIMM（上限64G）——96G 党绕道；主槽 CPU 直连 Gen4 x16 满血，第二槽只有 Gen3 x1（0.99GB/s→frac 0.03）别想双卡，配 9600X 单卡方案最省钱": "The AM5 POST board: 2 DIMMs (64G max) — 96G crowds, walk away; the primary slot is a full CPU-attached Gen4 x16, but slot 2 is Gen3 x1 (0.99 GB/s → frac 0.03), so forget dual GPUs. Cheapest pairing for a single-card 9600X build",
+      "AM5 新中端主力：主槽 Gen5 x16 满血+双 CPU 直连 Gen5 M.2，但第二槽仍是芯片组 Gen4 x4（6.6GB/s→frac0.18，同现板坑）——B850 不是 E 级，双卡党别按芯片组名字下菜": "The new AM5 mid-range workhorse: full Gen5 x16 primary plus two CPU-attached Gen5 M.2s, yet slot 2 is still chipset Gen4 x4 (6.6 GB/s → frac 0.18, the same trap as the current board) — B850 is not E-class; dual-GPU buyers, stop ordering chipsets by name",
+      "X870 非 E 的真相：官网槽位表第二槽只有芯片组 Gen3 x1（0.99GB/s→frac 0.03），第三槽 Gen4 x4 还会被 M2_3 装盘抢成 x2——想要 CPU 直连 x8/x8 还得是 E 级板": "The truth about non-E X870: per the spec page slot 2 is just chipset Gen3 x1 (0.99 GB/s → frac 0.03), and the Gen4 x4 slot 3 drops to x2 once M2_3 is populated — for CPU-attached x8/x8 you still need an E-class board",
+      "双舱海景房全塔：限长 440 吃得下 5090，顶/底/侧三处 360 冷排位；标配 2×160 反叶+1×140 后扇；E-ATX 只吃 280mm 宽以内的板": "A dual-chamber fishbowl full tower: the 440 mm GPU limit swallows a 5090, with 360 radiator mounts on top, bottom and side; ships with 2×160 reverse-blade plus 1×140 rear fans; E-ATX only up to 280 mm board width",
+      "胡桃木+网孔的设计师款：标配 2×140 风道安静；坑在顶部只到 240——360 冷排只能装前面，装完限长降到 300，5090/4090 直接出局": "The designer cut with real walnut and mesh: two 140 mm fans keep it quiet; the catch is a 240 mm top limit — the 360 radiator has to live in front, which cuts GPU clearance to 300 mm and benches the 5090/4090 outright",
+      "水冷改装床：限长 503 通吃现售所有卡，前 480/侧 480/顶 360 五冷排位；注意裸箱不配任何风扇，风冷方案先留一笔扇钱": "A custom-loop bed: 503 mm of GPU room eats every card on sale, with five radiator mounts (front 480 / side 480 / top 360); note the box ships with zero fans — air-coolers, budget for fans first"
   };
   /* 显示用：英文模式下查表，中文模式原样 */
   window.DN = function (txt) {

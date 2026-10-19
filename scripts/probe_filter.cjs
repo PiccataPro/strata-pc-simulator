@@ -1,7 +1,7 @@
 /* 分级筛选菜单 UI 探针：真点击 chips，验证级联显隐/过滤命中/取消清深层/mismatch 置灰/动态去重。
    用法：node scripts/probe_filter.cjs [baseUrl]
    货架 DOM：#shelfL=[cpu,mobo,ram,gpu]，#shelfR=[ssd,psu,cooler,case]（CATS 顺序对半）
-   断言数字来自 node 直查 parts.js：CPU 38(Intel15/AMD23)、GPU 27(AMD7)、mismatch 板11/条8。 */
+   断言数字来自 node 直查 parts.js：CPU 38(Intel15/AMD23)、GPU 27(AMD7)、mismatch 板15/条8（2026-10-19 主板扩至25后非LGA1700板=15）。 */
 'use strict';
 const puppeteer = require('puppeteer-core');
 const BASE = process.argv[2] || 'http://127.0.0.1:8901';
@@ -90,7 +90,7 @@ const T = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '  PASS
   /* ---- 主板 mismatch：默认 CPU=i7-12700KF(LGA1700)，非 LGA1700 板应置灰 ---- */
   s = await sec('#shelfL', 1);
   const mmIds = s.parts.filter(x => x.mm).map(x => x.id);
-  T('主板 mismatch 置灰 11 款且不含现机板', mmIds.length === 11 && !mmIds.includes('z790-gaming-plus'), mmIds);
+  T('主板 mismatch 置灰 15 款且不含现机板', mmIds.length === 15 && !mmIds.includes('z790-gaming-plus'), mmIds);
 
   /* ---- 内存 mismatch：默认主板 DDR5，DDR4 条应置灰 ---- */
   s = await sec('#shelfL', 2);

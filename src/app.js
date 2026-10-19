@@ -115,7 +115,7 @@ const VAL_EN = {
   微星: 'MSI', 华硕: 'ASUS', 技嘉: 'Gigabyte', 华擎: 'ASRock', 超微: 'Supermicro', 英特尔: 'Intel',
   海盗船: 'Corsair', 芝奇: 'G.Skill', 金士顿: 'Kingston', 三星: 'Samsung', 镁光: 'Micron', 西数: 'WD', 英睿达: 'Crucial',
   致态: 'ZHITAI', 铠侠: 'Kioxia', 海韵: 'Seasonic', 振华: 'Super Flower', 安钛克: 'Antec', 酷冷至尊: 'Cooler Master',
-  利民: 'Thermalright', 九州风神: 'DeepCool', 猫头鹰: 'Noctua', 先马: 'Sama', 联力: 'Lian Li', 追风者: 'Phanteks',
+  利民: 'Thermalright', 九州风神: 'DeepCool', 猫头鹰: 'Noctua', 先马: 'Sama', 联力: 'Lian Li', 追风者: 'Phanteks', 分形工艺: 'Fractal Design',
   'N 卡': 'NVIDIA', 'A 卡': 'AMD', 水冷: 'AIO', 风冷: 'Air', 中塔: 'Mid tower', 全塔: 'Full tower', 开放架: 'Open frame',
   机械盘: 'HDD', 白牌: '80+', 铜牌: 'Bronze', 金牌: 'Gold', 白金: 'Platinum', 钛金: 'Titanium',
   '旗舰(≥320W)': 'Flagship ≥320W', '高端(240-319W)': 'High 240-319W', '主流(<240W)': 'Mainstream <240W',
