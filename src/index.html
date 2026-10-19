@@ -63,6 +63,18 @@ header .tag{font-size:11px;color:var(--dim)}
 #cta3d.off{opacity:.5;cursor:not-allowed}
 #cta3d.off:hover{transform:none;border-color:#39465c}
 .shelf h3{font-size:12px;color:var(--dim);border-left:3px solid var(--acc);padding-left:6px;margin-top:4px}
+.shelf h3 .fold{color:var(--acc);font-size:10px}
+.shelf h3 .fcnt{color:#5c6b82;font-weight:400}
+/* ---- 分级筛选 chips ---- */
+.frow{display:flex;flex-wrap:wrap;gap:4px;align-items:center;padding:2px 0 2px 9px}
+.frow .flab{font-size:10px;color:#5c6b82;min-width:34px}
+.chip{font-size:10.5px;line-height:1;padding:3px 8px;border-radius:9px;border:1px solid var(--line);
+  background:var(--panel2);color:var(--dim);cursor:pointer;transition:.12s}
+.chip:hover{border-color:var(--acc);color:var(--txt)}
+.chip.on{background:#123049;border-color:var(--acc);color:#bfe3ff;font-weight:600}
+.fempty{font-size:11px;color:#5c6b82;padding:6px 10px;border:1px dashed var(--line);border-radius:8px;text-align:center}
+.part.mismatch{opacity:.55}
+.part.mismatch .mmw{color:var(--warn);margin-right:3px}
 .part{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:7px 9px;cursor:grab;user-select:none;transition:.15s}
 .part:hover{border-color:var(--acc);transform:translateY(-1px)}
 .part .nm{font-size:12px;font-weight:600}

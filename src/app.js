@@ -104,35 +104,105 @@ document.addEventListener('pointerdown', e => {
   if (uiPopEl && uiPopEl.style.display !== 'none' && !uiPopEl.contains(e.target)) window.hideUiPop();
 }, true);
 const MULTI = { ram: 4, gpu: 2, ssd: 4 }; // 可重复装配的品类及上限
+
+/* ---- 分级筛选菜单（数据层在 parts.js FILTER_TREE/filterParts） ----
+ * filterState[cat] = {层级key: 选中值}；点已选中的 chip = 取消该级并清空更深层。
+ * 级联：第 N 级 chips 只有在第 N-1 级选中后才出现；每级选项由上级过滤后的列表动态去重。 */
+const filterState = {};
+const collapsed = {};
+/* 筛选值的英文显示字典（数据值本身是中文，这里只做展示层翻译） */
+const VAL_EN = {
+  微星: 'MSI', 华硕: 'ASUS', 技嘉: 'Gigabyte', 华擎: 'ASRock', 超微: 'Supermicro', 英特尔: 'Intel',
+  海盗船: 'Corsair', 芝奇: 'G.Skill', 金士顿: 'Kingston', 三星: 'Samsung', 镁光: 'Micron', 西数: 'WD',
+  致态: 'ZHITAI', 铠侠: 'Kioxia', 海韵: 'Seasonic', 振华: 'Super Flower', 安钛克: 'Antec', 酷冷至尊: 'Cooler Master',
+  利民: 'Thermalright', 九州风神: 'DeepCool', 猫头鹰: 'Noctua', 先马: 'Sama', 联力: 'Lian Li', 追风者: 'Phanteks',
+  'N 卡': 'NVIDIA', 'A 卡': 'AMD', 水冷: 'AIO', 风冷: 'Air', 中塔: 'Mid tower', 全塔: 'Full tower', 开放架: 'Open frame',
+  机械盘: 'HDD', 白牌: '80+', 铜牌: 'Bronze', 金牌: 'Gold', 白金: 'Platinum', 钛金: 'Titanium',
+  '旗舰(≥320W)': 'Flagship ≥320W', '高端(240-319W)': 'High 240-319W', '主流(<240W)': 'Mainstream <240W',
+  线程撕裂者: 'Threadripper', '12代': '12th gen', '13代': '13th gen', '14代': '14th gen',
+};
+const FV = v => (window.STRATA_LANG === 'en' && VAL_EN[v] != null ? VAL_EN[v] : v);
+function shelfList(cat, arr) {
+  const sel = filterState[cat] || {};
+  return P.filterParts(cat, P[arr], sel);
+}
+/* 品类头部：折叠开关 + 级联筛选 chips */
+function renderFilterBar(el, c) {
+  const tree = P.FILTER_TREE[c.k] || [];
+  const sel = filterState[c.k] || (filterState[c.k] = {});
+  tree.forEach((lv, li) => {
+    /* 级联：上级没选就不显示本级；本级选项 = 按上级过滤后的动态去重 */
+    if (li > 0 && (sel[tree[li - 1].key] == null || sel[tree[li - 1].key] === '')) return;
+    const parentFiltered = P.filterParts(c.k, P[c.arr], Object.fromEntries(tree.slice(0, li).map(t => [t.key, sel[t.key]]).filter(([, v]) => v != null && v !== '')));
+    const opts = lv.opts(parentFiltered);
+    if (!opts.length) return;
+    const row = document.createElement('div'); row.className = 'frow';
+    const lab = document.createElement('span'); lab.className = 'flab'; lab.textContent = L(lv.zh, lv.en); row.appendChild(lab);
+    const mk = (label, on, click) => {
+      const b = document.createElement('button');
+      b.className = 'chip' + (on ? ' on' : ''); b.textContent = label;
+      b.addEventListener('click', ev => { ev.stopPropagation(); click(); });
+      row.appendChild(b);
+    };
+    mk(L('全部', 'All'), sel[lv.key] == null || sel[lv.key] === '', () => { sel[lv.key] = ''; tree.slice(li + 1).forEach(t => sel[t.key] = ''); renderShelves(); });
+    opts.forEach(v => mk(FV(String(v)) + (typeof v === 'number' && (lv.key === 'size' || lv.key === 'w') ? (lv.key === 'w' ? 'W' : 'G') : ''), String(sel[lv.key]) === String(v), () => {
+      if (String(sel[lv.key]) === String(v)) { sel[lv.key] = ''; }
+      else { sel[lv.key] = v; }
+      tree.slice(li + 1).forEach(t => sel[t.key] = '');
+      renderShelves();
+    }));
+    el.appendChild(row);
+  });
+}
+
 function renderShelves() {
   /* 单件制品类：装了就置灰；多件制（内存/显卡/SSD）：显示已装×N，到上限才置灰 */
   const inUse = new Set([build.cpu, build.mobo, build.psu, build.cooler, build.case].filter(Boolean));
   const cnt = {};
   [].concat(build.ram.filter(Boolean), build.gpu, build.ssd).forEach(id => { cnt[id] = (cnt[id] || 0) + 1; });
+  /* 兼容警示基准：装了 CPU → 主板 socket 不匹配标 ⚠；装了主板 → 内存 DDR 代际不匹配标 ⚠ */
+  const cpuP = build.cpu ? P.byId(build.cpu) : null;
+  const moboP = build.mobo ? P.byId(build.mobo) : null;
   const half = Math.ceil(CATS.length / 2);
   [[document.getElementById('shelfL'), CATS.slice(0, half)], [document.getElementById('shelfR'), CATS.slice(half)]].forEach(([el, cats]) => {
     el.innerHTML = '';
     cats.forEach(c => {
-      const h = document.createElement('h3'); h.textContent = L(c.t, c.e); el.appendChild(h);
-      P[c.arr].forEach(p => {
+      const h = document.createElement('h3');
+      const total = P[c.arr].length, shown = shelfList(c.k, c.arr).length;
+      h.innerHTML = '<span class="fold">' + (collapsed[c.k] ? '▸' : '▾') + '</span> ' + L(c.t, c.e) +
+        ' <span class="fcnt">' + (shown === total ? total : shown + '/' + total) + '</span>';
+      h.style.cursor = 'pointer';
+      h.addEventListener('click', () => { collapsed[c.k] = !collapsed[c.k]; renderShelves(); });
+      el.appendChild(h);
+      if (!collapsed[c.k]) renderFilterBar(el, c);
+      if (collapsed[c.k]) return;
+      shelfList(c.k, c.arr).forEach(p => {
         const n = cnt[p.id] || 0, lim = c.k === 'ram' ? ramSlotCount() : MULTI[c.k]; // 内存上限=当前主板槽数
+        const mismatch = (c.k === 'mobo' && cpuP && p.socket !== cpuP.socket)
+          || (c.k === 'ram' && moboP && p.gen !== moboP.ddr)
+          || (c.k === 'ram' && cpuP && !cpuP.ddr.includes(p.gen));
         const d = document.createElement('div');
-        d.className = 'part cat-' + c.k + ((inUse.has(p.id) || (lim && n >= lim)) ? ' inuse' : '');
+        d.className = 'part cat-' + c.k + ((inUse.has(p.id) || (lim && n >= lim)) ? ' inuse' : '') + (mismatch ? ' mismatch' : '');
         d.draggable = true; d.dataset.id = p.id; d.dataset.cat = c.k;
         const sp = c.k === 'cpu' ? (p.p + 'P' + (p.e ? '+' + p.e + 'E' : '') + '/' + p.thr + 'T · ' + ({ '512': 'AVX-512', vnni: 'AVX-VNNI', avx2: 'AVX2' })[p.simd] + (p.igpu !== 'none' ? L(' · 核显',' · iGPU') : L(' · 无核显',' · no iGPU')))
           : c.k === 'mobo' ? (p.socket + ' · DDR' + p.ddr + L(' · 槽:',' · slots:') + p.slots.map(s => 'x' + s.lanes + (s.src === 'cpu' ? 'CPU' : L('芯','chip'))).join('+'))
           : c.k === 'ram' ? ('DDR' + p.gen + ' ' + p.size + 'G ' + p.mt + 'MT/s')
-          : c.k === 'gpu' ? (p.vram + 'G · ' + p.bw + 'GB/s · SM' + p.sm + ' · ' + p.tdp + 'W' + (p.mod ? L(' · 魔改',' · modded') : ''))
-          : c.k === 'ssd' ? (p.type === 'nvme' ? 'NVMe Gen' + p.gen + ' ' + p.read + 'MB/s' : L('SATA机械 ','SATA HDD ') + p.read + 'MB/s')
+          : c.k === 'gpu' ? (p.vram + 'G · ' + p.bw + 'GB/s · SM' + p.sm + ' · ' + p.tdp + 'W' + (p.mod ? L(' · 魔改',' · modded') : '') + (p.vendor === 'amd' ? L(' · A卡(Vulkan)',' · AMD (Vulkan)') : ''))
+          : c.k === 'ssd' ? (p.type === 'nvme' ? 'NVMe Gen' + p.gen + ' ' + p.read + 'MB/s' : p.type === 'sata_ssd' ? 'SATA SSD ' + p.read + 'MB/s' : L('SATA机械 ','SATA HDD ') + p.read + 'MB/s')
           : c.k === 'psu' ? (p.w + 'W · 8pin×' + p.conn8 + ' · 16pin×' + p.conn16pin)
-          : c.k === 'cooler' ? (L('解热','cools ') + p.cap + 'W · ' + (p.type === 'aio' ? L('360水冷','AIO 360') : L('风冷','air')))
+          : c.k === 'cooler' ? (L('解热','cools ') + p.cap + 'W · ' + (p.type === 'aio' ? (p.radFans === 2 ? L('240水冷','AIO 240') : L('360水冷','AIO 360')) : L('风冷','air')))
           : (L('限长','GPU limit ') + p.gpuMaxLen + 'mm · ' + p.fans + L('风扇',' fans'));
-        d.innerHTML = '<span class="pr">¥' + p.price.toLocaleString() + (lim && n ? ' <b style="color:#3fd68f">' + L('已装×','equipped ') + n + '/' + lim + '</b>' : '') + '</span><div class="nm">' + DN(p.name) + '</div><div class="sp">' + sp + '</div>' + (p.note ? '<div class="sp" style="color:#6fa8dc">📌' + DN(p.note).slice(0, 46) + (p.note.length > 46 ? '…' : '') + '</div>' : '');
+        d.innerHTML = '<span class="pr">¥' + p.price.toLocaleString() + (lim && n ? ' <b style="color:#3fd68f">' + L('已装×','equipped ') + n + '/' + lim + '</b>' : '') + '</span><div class="nm">' + (mismatch ? '<span class="mmw" title="' + L('与当前' + (c.k === 'mobo' ? 'CPU插槽' : '内存代际') + '不匹配','mismatch with current build') + '">⚠</span>' : '') + DN(p.name) + '</div><div class="sp">' + sp + '</div>' + (p.note ? '<div class="sp" style="color:#6fa8dc">📌' + DN(p.note).slice(0, 46) + (p.note.length > 46 ? '…' : '') + '</div>' : '');
         d.title = DN(p.note) || '';
         d.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', p.id); });
         d.addEventListener('dblclick', () => install(p.id, p.cat));
         el.appendChild(d);
       });
+      if (!shelfList(c.k, c.arr).length) {
+        const e2 = document.createElement('div'); e2.className = 'fempty';
+        e2.textContent = L('该筛选组合下没有配件', 'No parts match this filter');
+        el.appendChild(e2);
+      }
     });
   });
 }

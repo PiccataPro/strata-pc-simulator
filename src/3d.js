@@ -15,6 +15,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { PANEL_NORMAL_PNG, PANEL_ROUGH_PNG } from './texdata.js';
 import { GPU_SHROUD_PNG, MOBO_PCB_PNG, CPU_IHS_PNG, FAN_HUB_PNG } from './texdata2.js';
 import { RAM_ARMOR_BLACK_PNG, RAM_ARMOR_WHITE_PNG, COOLER_TOP_PNG, AIO_PUMP_PNG, PSU_LABEL_PNG, CASE_SHROUD_PNG, GPU_BACKPLATE_PNG } from './texdata3.js';
+import { CPU_IHS_AMD_PNG, GPU_SHROUD_AMD_PNG, GPU_BACKPLATE_AMD_PNG, RAM_ARMOR_SILVER_PNG } from './texdata4.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 const P = window.STRATA_PARTS;
@@ -155,6 +156,11 @@ function initMaterials() {
   M.__psuLabel = loadDecal(PSU_LABEL_PNG);
   M.__caseShroud = loadDecal(CASE_SHROUD_PNG);
   M.__gpuBack = loadDecal(GPU_BACKPLATE_PNG);
+  /* 第三批（texdata4）：AMD 阵营专属 + 银色马甲。素材未生成时为空串→null→程序化兜底 */
+  M.__cpuIhsAmd = loadDecal(CPU_IHS_AMD_PNG);
+  M.__gpuShroudAmd = loadDecal(GPU_SHROUD_AMD_PNG);
+  M.__gpuBackAmd = loadDecal(GPU_BACKPLATE_AMD_PNG);
+  M.__ramSilver = loadDecal(RAM_ARMOR_SILVER_PNG);
   const grain = (mat, mm, ns) => {
     const t = M.__grain.clone();
     t.needsUpdate = true;
@@ -636,9 +642,12 @@ function buildMotherboard(m, a) {
   a.pcie.forEach(p => {
     const col = p.frac >= 0.9 ? 0x3fd68f : p.frac >= 0.5 ? 0xffb454 : 0xff5d6c;
     const len = L.pcieLen[p.lanes] || 89;
-    const slot = box(6, 12, len, M.aluDark, 4, L.pcieY[p.pos], z0 + w - 8 - len / 2);
+    /* 槽 y：布局表只定义了物理槽 1~4；HEDT/服务器板（TRX40 槽5、H11DSi 槽5/7/9）
+       按 20mm 槽距向下外推，避免 undefined 坐标变 NaN 让整块槽消失 */
+    const sy = L.pcieY[p.pos] != null ? L.pcieY[p.pos] : Math.max(120, L.pcieY[4] - (p.pos - 4) * 20);
+    const slot = box(6, 12, len, M.aluDark, 4, sy, z0 + w - 8 - len / 2);
     g.add(slot);
-    const glow = box(1.5, 2, len, M.emissive(col, 1.6), 7.5, L.pcieY[p.pos] + 7, z0 + w - 8 - len / 2); g.add(glow);
+    const glow = box(1.5, 2, len, M.emissive(col, 1.6), 7.5, sy + 7, z0 + w - 8 - len / 2); g.add(glow);
   });
   // 24pin + EPS 插座（贴板头一侧）
   g.add(box(8, 45, 24, M.black, 5, y0 + 150, z0 + 8));
@@ -657,8 +666,10 @@ function buildCPU(c) {
   g.add(box(2, L.cpu.s, L.cpu.s, M.pcbGpu, 4.5, L.cpu.y, L.cpu.z));
   const ihs = box(3.5, L.cpu.s - 12, L.cpu.s - 8, M.nickel, 6.5, L.cpu.y, L.cpu.z); g.add(ihs);
   /* pc53 写实 IHS 顶盖贴图：贴 +X 面（侧透可见面），镀镍拉丝+蚀刻型号。
-     装了散热器时被冷头/塔体遮住，和真机一致。 */
-  if (M.__cpuIhs) g.add(texPlane(L.cpu.s - 8, L.cpu.s - 12, M.__cpuIhs, 8.55, L.cpu.y, L.cpu.z,
+     装了散热器时被冷头/塔体遮住，和真机一致。
+     AMD 阵营（AM4/AM5/TRX4/SP3）用红黑 IHS 贴图（texdata4），素材缺失时不贴（宁缺勿错）。 */
+  const ihsTex = c.brand === 'AMD' ? M.__cpuIhsAmd : M.__cpuIhs;
+  if (ihsTex) g.add(texPlane(L.cpu.s - 8, L.cpu.s - 12, ihsTex, 8.55, L.cpu.y, L.cpu.z,
     [0, Math.PI / 2, 0], { metal: 0.9, rough: 0.25 }));
   g.userData.anchor = [5.5, L.cpu.y, L.cpu.z];
   g.userData.fitBox = { x: 6, y: L.cpu.s, z: L.cpu.s };
@@ -674,11 +685,14 @@ function buildCooler(co) {
     /* 写实泵顶贴图（pc53 正交俯视图：圆形金属泵盖+中心镜面logo）：贴冷头 +X 圆面（侧透可见）。
        冷头半径 32，贴图取直径 ~58 的圆面，rot=[0,π/2,0] 让圆面法线朝 +X。 */
     if (M.__aioPump) g.add(texPlane(58, 58, M.__aioPump, 32.6, L.cpu.y, L.cpu.z, [0, Math.PI / 2, 0], { metal: 0.7, rough: 0.35 }));
-    /* 顶部冷排：380mm 居中放在 z=250（占 60…440），尾部对齐后不会顶穿端面。 */
-    const rad = box(70, 28, 380, M.steelDark, L.caseIn.w / 2, L.topY - 16, 250); g.add(rad);
-    for (let i = 0; i < 3; i++) {
+    /* 顶部冷排：长度读数据（radLen 默认 380=360 冷排）。380mm 居中放在 z=250（占 60…440），
+       240 冷排（270mm）居中占 115…385——尾部对齐后都不会顶穿端面。风扇数读 radFans。
+       风扇起点公式按冷排中心推（-50 偏移保证 360 冷排时与原布局 390/265/140 完全一致）。 */
+    const radLen = co.radLen || 380, nRad = co.radFans || 3;
+    const rad = box(70, 28, radLen, M.steelDark, L.caseIn.w / 2, L.topY - 16, 250); g.add(rad);
+    for (let i = 0; i < nRad; i++) {
       const f = makeFan(120, 0x7fd1ff);           // makeFan 默认轴沿 Y，正对上方冷排吹
-      f.position.set(L.caseIn.w / 2, L.topY - 42, L.caseIn.d - 60 - i * 125); g.add(f);
+      f.position.set(L.caseIn.w / 2, L.topY - 42, 250 + radLen / 2 - 50 - i * 125); g.add(f);
     }
     // 水管：从冷头绕到顶部冷排
     g.userData.tubes = [
@@ -689,14 +703,15 @@ function buildCooler(co) {
     const copper = M.copper || (M.copper = new THREE.MeshStandardMaterial({ color: 0xb87333, metalness: 1, roughness: 0.35 }));
     g.add(box(6, 40, 40, copper, 12, L.cpu.y - 24, L.cpu.z));   // 底座
     /* 塔体：鳍片沿 Z 叠成一块 finX(X) × towerH(Y) 的方块。
-       宽度按真机规格：NH-D15 150mm、PA120SE 125mm、利民 AX120 120mm。
-       （高度没敢照抄 165mm —— 见下面 height 那行的说明。） */
-    const finX = co.id === 'd15' ? 150 : co.id === 'pa120se' ? 125 : 120;
-    const fanD = co.id === 'd15' ? 140 : 120;
+       尺寸全部读 parts.js 数据字段（finW/fanD/towerH/towers，2026-10-19 扩库时参数化）：
+       NH-D15 150mm、PA120SE 125mm、AX120 120mm、AK620 127mm。
+       （高度没敢照抄 165mm —— 见 towerH 那行的说明。） */
+    const finX = co.finW || 120;
+    const fanD = co.fanD || 120;
     /* 高度受机箱限制：本机箱内腔 470 高，CPU 中心在 352，到顶只剩 118mm。
-       真机 D15 是 165mm，照抄会直接顶穿顶板，所以这里按可用净空压到 150。 */
-    const towerH = co.id === 'd15' ? 150 : 150;
-    const nT = co.id === 'd15' || co.id === 'pa120se' ? 2 : 1;
+       真机 D15 是 165mm，照抄会直接顶穿顶板，所以数据里统一按可用净空压到 150。 */
+    const towerH = co.towerH || 150;
+    const nT = co.towers || 1;
     /* 塔体：鳍片沿 Z 叠成一块 finX(X) × towerH(Y) 的方块。
        塔心稍微前移（cz），否则 118~160mm 深的塔体会顶穿机箱后窗。 */
     const nFin = nT === 2 ? 10 : 19, pitch = 5 + 1.2;
@@ -733,12 +748,18 @@ function buildDIMM(d, i) {
    *   Z = 1.6mm PCB 厚度（槽距方向）
    * 旧版把 31mm 写成了 2mm，整条就只剩 133×7 的一根棍子。 */
   const X0 = 5, HGT = 31, PCB = 1.6;
-  /* 马甲颜色按套条区分：真实市场里同一容量就有黑 / 白两种马甲（海盗船 LPX 黑、复仇者 RGB 白） */
-  const white = /d5-32|d4-32/.test(d.id);
+  /* 马甲颜色读 parts.js color 字段（2026-10-19 扩库参数化）：
+   * 真实市场同容量就有 黑/白/银 三种马甲（LPX 黑、复仇者白、Ripjaws 银）；green=裸 PCB 无马甲 */
+  const white = d.color === 'white', silver = d.color === 'silver', bare = d.color === 'green';
   const armor = white
     ? new THREE.MeshStandardMaterial({ color: 0xd8dbe1, metalness: 0.55, roughness: 0.34 })
+    : silver
+    ? new THREE.MeshStandardMaterial({ color: 0xa7adb8, metalness: 0.8, roughness: 0.3 })
+    : bare
+    ? new THREE.MeshStandardMaterial({ color: 0x1d3326, metalness: 0.35, roughness: 0.6 })
     : new THREE.MeshStandardMaterial({ color: 0x2d3036, metalness: 0.72, roughness: 0.42 });
   g.add(box(HGT, L.dimm.h, PCB, M.pcbRam, X0 + HGT / 2, yc, z));                 // PCB
+  if (!bare) {
   g.add(box(HGT - 4, L.dimm.h - 8, 2, armor, X0 + HGT / 2, yc, z - 1.9));        // 马甲（前）
   g.add(box(HGT - 4, L.dimm.h - 8, 2, armor, X0 + HGT / 2, yc, z + 1.9));        // 马甲（后）
   /* 马甲侧面的竖向鳍片：真马甲是一排冲压出来的立筋，平板上看只有明暗条纹 */
@@ -747,14 +768,17 @@ function buildDIMM(d, i) {
     g.add(box(1.6, L.dimm.h - 14, 1.2, armor, rx, yc, z - 3.1));
     g.add(box(1.6, L.dimm.h - 14, 1.2, armor, rx, yc, z + 3.1));
   }
-  /* 顶部 RGB 导光条：沿 Y 铺在离板最远的那条边上 */
+  }
+  /* 顶部 RGB 导光条：沿 Y 铺在离板最远的那条边上（裸条/RECC 服务器条没有灯） */
+  if (!bare) {
   const bar = rgbBar(4, L.dimm.h - 16, 6, (i * 0.13) % 1);
   bar.position.set(X0 + HGT - 2, yc, z); g.add(bar);
-  /* 写实马甲贴图（Kingston FURY Beast 官方正侧视图，黑/白按套条）：贴马甲 ±Z 大面。
-     贴图已 CW 转 90°：长边（金手指长度）沿 v、金手指落 u=0。马甲面 27(X)×125(Y)。
+  }
+  /* 写实马甲贴图（Kingston FURY Beast 官方正侧视图，黑/白按套条；银色用 texdata4 素材，缺则纯色兜底）：
+     贴马甲 ±Z 大面。贴图已 CW 转 90°：长边（金手指长度）沿 v、金手指落 u=0。马甲面 27(X)×125(Y)。
      后脸(+Z) rot=0 使金手指(u=0)落在靠主板侧(低X)；前脸(-Z) 绕 Y 翻 180°。 */
-  const ramTex = white ? M.__ramWhite : M.__ramBlack;
-  if (ramTex) {
+  const ramTex = bare ? null : silver ? (M.__ramSilver || M.__ramBlack) : white ? M.__ramWhite : M.__ramBlack;
+  if (ramTex && !bare) {
     g.add(texPlane(27, 125, ramTex, X0 + HGT / 2, yc, z + 3.0, [0, 0, 0], { metal: 0.5, rough: 0.42 }));
     g.add(texPlane(27, 125, ramTex, X0 + HGT / 2, yc, z - 3.0, [0, Math.PI, 0], { metal: 0.5, rough: 0.42 }));
   }
@@ -767,10 +791,16 @@ function buildDIMM(d, i) {
 const GPU_HGT = {
   'rtx-3080-10g': 112, 'rtx-3080-20g': 120, 'rtx-3090': 120, 'rtx-2080ti-22g': 112,
   'rtx-4070s': 130, 'rtx-4090': 137, 'rtx-5090': 137, 'rtx-pro-4500': 112, 'rtx-a6000': 112,
+  /* 2026-10-19 扩库新增（FE/公版或主流非公官方规格，mm） */
+  'rtx-3060-12g': 112, 'rtx-3070-8g': 112, 'rtx-4060ti-16g': 115, 'rtx-4070': 115,
+  'rtx-4070tis': 137, 'rtx-4080s': 137, 'rtx-5070': 114, 'rtx-5070tis': 130, 'rtx-5080': 130,
+  'rx-6750xt-12g': 115, 'rx-7600-8g': 110, 'rx-7800xt-16g': 115, 'rx-7900xtx-24g': 110, 'rx-9070xt-16g': 130,
 };
 function buildGPU(gpu, assign, i) {
   const g = new THREE.Group();
-  const slotY = L.pcieY[assign.slotPos] || L.pcieY[4];
+  /* HEDT/服务器板物理槽超出布局表（TRX40 槽5、H11DSi 槽5/7/9）：按 20mm 槽距外推，
+     钳到主板下沿 118 以上。多卡在高数槽位上视觉会贴近/略叠（内腔高度物理上限），数据层不受影响。 */
+  const slotY = L.pcieY[assign.slotPos] != null ? L.pcieY[assign.slotPos] : Math.max(118, L.pcieY[4] - (assign.slotPos - 4) * 20);
   const th = gpu.thick * 20;              // 厚度（沿 Y）：2 槽 40 / 3 槽 60
   const len = gpu.len;                    // 长度（沿 Z）
   const HGT = GPU_HGT[gpu.id] || 112;     // 高度（沿 X）：从金手指平面到卡顶
@@ -788,17 +818,25 @@ function buildGPU(gpu, assign, i) {
    * 旧版把「厚度」当成了 X、「高度」当成了 Y，整张卡是竖着贴在主板上的，
    * 于是挡板横穿机箱、风扇圆心落在托盘里、卡体只有 30mm 厚却堆了 98mm 高。 */
   g.add(box(HGT - 8, 1.6, len - 14, M.pcbGpu, xc, slotY, zc));                        // PCB
-  g.add(box(HGT - 12, th - 12, len - 22, M.gpuBody, xc, botY + 12 + (th - 12) / 2, zc)); // 散热罩（中性灰塑料）
+  /* A 卡（vendor:'amd'）散热罩用偏黑塑料+红黑配色基调；N 卡保持中性灰。
+     写实导风罩/背板贴图按阵营分流：A 卡优先 texdata4 素材，缺则纯色程序化兜底。 */
+  const isAmd = gpu.vendor === 'amd';
+  const bodyMat = isAmd
+    ? (M.gpuBodyAmd || (M.gpuBodyAmd = new THREE.MeshStandardMaterial({ color: 0x23262b, metalness: 0.3, roughness: 0.5 })))
+    : M.gpuBody;
+  g.add(box(HGT - 12, th - 12, len - 22, bodyMat, xc, botY + 12 + (th - 12) / 2, zc)); // 散热罩
   /* pc53 写实导风罩贴图：贴在散热罩底面（风扇安装面），三圆口透出真实 3D 风扇。
      贴图已裁掉挡板/金手指、RGB 灯带朝向卡顶前缘（与 Gaming X Slim 实物一致）。 */
-  if (M.__gpuShroud) g.add(texPlane(HGT - 12, len - 22, M.__gpuShroud, xc, botY + 11.7, zc,
+  const shroudTex = isAmd ? M.__gpuShroudAmd : M.__gpuShroud;
+  if (shroudTex) g.add(texPlane(HGT - 12, len - 22, shroudTex, xc, botY + 11.7, zc,
     [Math.PI / 2, 0, 0], { metal: 0.35, rough: 0.5 }));
   g.add(box(HGT - 16, 1.5, len - 18, M.alu, xc, slotY + 2.3, zc));                    // 背板
   /* 写实背板贴图（pc53 正交生成：拉丝铝+RTX logo+栅格+四角螺丝，铭铭验收）：
      贴卡顶面（法线 +Y，侧透主视角）。rot=[-π/2,0,0] → u 沿世界 +X（卡顶边缘，栅格落这边）、
      v 沿 -Z（卡长）。程序化版贴背板顶 3.2；GLB 版由 postGlbDecal 在白模顶(slotY+4)补挂。 */
   const addBack = yTop => {
-    if (M.__gpuBack) g.add(texPlane(HGT - 16, len - 18, M.__gpuBack, xc, yTop, zc,
+    const backTex = isAmd ? M.__gpuBackAmd : M.__gpuBack;
+    if (backTex) g.add(texPlane(HGT - 16, len - 18, backTex, xc, yTop, zc,
       [-Math.PI / 2, 0, 0], { metal: 0.85, rough: 0.32 }));
   };
   addBack(slotY + 3.2);
@@ -854,6 +892,10 @@ function buildSSD(s, i) {
     const y = L.pcieY[2] - 14 - i * 16, z = L.mobo.z0 + L.mobo.w - 60;
     g.add(box(2, 22, 80, M.pcbGpu, 4, y, z));
     g.add(box(6, 20, 74, M.aluDark, 8, y, z));
+  } else if (s.type === 'sata_ssd') {
+    /* 2.5" SATA SSD：7×100×69.9mm，立在电源仓前部的硬盘位（Y 向薄、Z 向长） */
+    g.add(box(7, 100, 70, M.aluDark, 90, 100, 120));
+    g.add(box(1, 60, 40, M.emissive(0x54d6c8, 0.5), 94, 100, 120));
   } else {
     g.add(box(146, 26, 101, M.alu, 90, 40, 100)); // 3.5" 机械盘（放在 Z=0 侧的硬盘位，避开尾部电源仓）
   }
@@ -872,7 +914,9 @@ function buildPSU(p) {
      替换旧的文字贴花。程序化版直接挂；GLB 版由 postGlbDecal 在白模加载后补挂
      ——attachGLB 会把程序化子件整组 visible=false，直接挂会被一起藏掉。 */
   const addLabel = () => {
-    if (M.__psuLabel) g.add(texPlane(150, 75, M.__psuLabel, 170.8, y + 2, zR - len / 2,
+    /* 铭牌贴图是 AX1200i（海盗船帆船logo）——只挂海盗船电源，其它品牌用程序化标签灯，
+       免得振华/海韵的电源印着海盗船的标（张冠李戴比素面更假）。 */
+    if (M.__psuLabel && p.brand === '海盗船') g.add(texPlane(150, 75, M.__psuLabel, 170.8, y + 2, zR - len / 2,
       [0, Math.PI / 2, 0], { metal: 0.3, rough: 0.55 }));
   };
   addLabel();
@@ -1865,6 +1909,7 @@ window.STRATA_3D = { init, sync, setPhase, setTelemetry, toggleDoor, resetView, 
       const st = t => ({ loaded: !!t, img: !!(t && t.image && t.image.complete), inScene: count(t) });
       return { moboPcb: st(M.__moboPcb), cpuIhs: st(M.__cpuIhs), gpuShroud: st(M.__gpuShroud), fanHub: st(M.__fanHub),
         ramBlack: st(M.__ramBlack), ramWhite: st(M.__ramWhite), coolerTop: st(M.__coolerTop), aioPump: st(M.__aioPump),
-        psuLabel: st(M.__psuLabel), caseShroud: st(M.__caseShroud), gpuBack: st(M.__gpuBack) };
+        psuLabel: st(M.__psuLabel), caseShroud: st(M.__caseShroud), gpuBack: st(M.__gpuBack),
+        cpuIhsAmd: st(M.__cpuIhsAmd), gpuShroudAmd: st(M.__gpuShroudAmd), gpuBackAmd: st(M.__gpuBackAmd), ramSilver: st(M.__ramSilver) };
     })(),
   }) };
